@@ -2,4 +2,4 @@
 ## Run instructions
     $ cd assignment1
     $ make
-    $ ./asst1
+    $ ./main
