@@ -1,3 +1,11 @@
+// _____________________________________________________
+//|                                                   
+//|  Ahmad Ghizzawi - Chukri Soueidi                    
+//|  Assigntment One - CMPS 385   
+//|____________________________________________________
+
+
+
 #include <vector>
 #include <string>
 #include <memory>
