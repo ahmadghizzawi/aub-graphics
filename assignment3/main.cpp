@@ -387,6 +387,52 @@ static void manipulateObjects(RigTForm &Q) {
   }
 }
 
+static void printActiveView(int activeView) {
+  switch (activeView) {
+  case SKY:
+    std::cout << "Sky camera frame is active." << '\n';
+    break;
+  case OBJECT0:
+    std::cout << "Object 0 frame is active." << '\n';
+    break;
+  case OBJECT1:
+    std::cout << "Object 1 frame is active." << '\n';
+    break;
+  }
+}
+
+static void printActiveObject(int activeObject) {
+  switch (activeObject) {
+  case OBJECT0:
+    cout << "Object 0 is active." << '\n';
+    break;
+  case OBJECT1:
+    cout << "Object 1 is active." << '\n';
+    break;
+  case SKY:
+    cout << "Sky is now active." << '\n';
+    break;
+  default:
+    cout << "Object 0 is active." << '\n';
+  }
+}
+
+// _____________________________________________________
+//|                                                     |
+//|  GLUT CALLBACKS                                     |
+//|_____________________________________________________|
+///
+
+// _____________________________________________________
+//|                                                     |
+//|  display                                            |
+//|_____________________________________________________|
+///
+///  Whenever OpenGL requires a screen refresh
+///  it will call display() to draw the scene.
+///  We specify that this is the correct function
+///  to call with the glutDisplayFunc() function
+///  during initialization
 static void display() {
   glUseProgram(g_shaderStates[g_activeShader]->program);
   glClear(GL_COLOR_BUFFER_BIT |
@@ -399,6 +445,14 @@ static void display() {
   checkGlErrors();
 }
 
+// _____________________________________________________
+//|                                                     |
+//|  reshape                                            |
+//|_____________________________________________________|
+///
+///  Whenever a window is resized, a "resize" event is
+///  generated and glut is told to call this reshape
+///  callback function to handle it appropriately.
 static void reshape(const int w, const int h) {
   g_windowWidth = w;
   g_windowHeight = h;
@@ -408,6 +462,14 @@ static void reshape(const int w, const int h) {
   glutPostRedisplay();
 }
 
+// _____________________________________________________
+//|                                                     |
+//|  motion                                             |
+//|_____________________________________________________|
+///
+///  Whenever the mouse is moved while a button is pressed,
+///  a "mouse move" event is triggered and this callback is
+///  called to handle the event.
 static void motion(const int x, const int y) {
   double dx = x - g_mouseClickX;
   double dy = g_windowHeight - y - 1 - g_mouseClickY;
@@ -456,38 +518,14 @@ static void motion(const int x, const int y) {
   g_mouseClickY = g_windowHeight - y - 1;
 }
 
-static void printActiveView(int activeView) {
-  switch (activeView) {
-  case SKY:
-    std::cout << "Sky camera frame is active." << '\n';
-    break;
-  case OBJECT0:
-    std::cout << "Object 0 frame is active." << '\n';
-    break;
-  case OBJECT1:
-    std::cout << "Object 1 frame is active." << '\n';
-    break;
-  }
-}
-
-static void printActiveObject(int activeObject) {
-  switch (activeObject) {
-  case OBJECT0:
-    cout << "Object 0 is active." << '\n';
-    break;
-  case OBJECT1:
-    cout << "Object 1 is active." << '\n';
-    break;
-  case SKY:
-    cout << "Sky is now active." << '\n';
-    break;
-  default:
-    cout << "Object 0 is active." << '\n';
-  }
-}
-
-
-
+// _____________________________________________________
+//|                                                     |
+//|  mouse                                              |
+//|_____________________________________________________|
+///
+///  Whenever a mouse button is clicked, a "mouse" event
+///  is generated and this mouse callback function is
+///  called to handle the user input.
 static void mouse(const int button, const int state, const int x, const int y) {
   g_mouseClickX = x;
   g_mouseClickY = g_windowHeight - y - 1; // conversion from GLUT
@@ -515,6 +553,14 @@ static void keyboardUp(const unsigned char key, const int x, const int y) {
   glutPostRedisplay();
 }
 
+// _____________________________________________________
+//|                                                     |
+//|  keyboard                                           |
+//|_____________________________________________________|
+///
+///  Whenever a keyboard key is clicked, a "keyboad" event is
+///  generated and glut is told to call this keyboard
+///  callback function to handle it appropriately.
 static void keyboard(const unsigned char key, const int x, const int y) {
   switch (key) {
   case 27:
@@ -567,6 +613,11 @@ static void keyboard(const unsigned char key, const int x, const int y) {
   glutPostRedisplay();
 }
 
+// _____________________________________________________
+//|                                                     |
+//|  Helper Functions                                   |
+//|_____________________________________________________|
+///
 static void initGlutState(int argc, char *argv[]) {
   glutInit(&argc, argv); // initialize Glut based on cmd-line args
 #ifdef __MAC__
