@@ -4,8 +4,10 @@
 ### General
 - Moved all .h files into headers folder.
 - Added the provided helper headers (quat.h, rigtform, arcball.h).
-### Task 1: Rigid Body transformations
-- Implemented TODO functionality inside the rigtform.h file.
-- Replaced all matrix4 operations by RigTForm functions in main.cpp file.
-### Task 2: Arcball
-- 
+
+### Tasks
+- [x] All tasks were implemented as described in the document.
+
+### Known Issues:
+- When using the spacebar + right mouse click combo to translate in the Z-directions,
+  the behavior is not the expected one.

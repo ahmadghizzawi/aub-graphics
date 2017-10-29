@@ -1,3 +1,9 @@
+// _____________________________________________________
+//|                                                     |
+//|  Ahmad Ghizzawi - Chukri Soueidi                    |
+//|  Assigntment III - CMPS 385                         |
+//|____________________________________________________ |
+
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -58,7 +64,10 @@ static const int SKY = 2;
 // Default view and object.
 static int g_activeObject = OBJECT0;
 static int g_activeEye = SKY;
-static bool g_worldSky = true;
+static bool g_worldSkyFrame = true;
+
+static double g_arcballScreenRadius = 1.0;
+static double g_arcballScale = 1.0;
 
 /*
 For communication with shaders.
@@ -181,7 +190,7 @@ struct Geometry {
 };
 
 // Vertex buffer and index buffer associated with the ground and cube geometry
-static shared_ptr<Geometry> g_ground, g_cube, g_cube_1;
+static shared_ptr<Geometry> g_ground, g_cube, g_cube_1, g_arcball;
 
 // --------- Scene
 
@@ -195,7 +204,12 @@ static RigTForm g_skyRbt(Cvec3(0.0, 0.25, 4.0));
 
 // CHANGE
 // Replaced Matrix4 by RigTForm
-static RigTForm g_worldRbt(Cvec3(0.0, 0.0, 0.0));
+static RigTForm g_worldRbt(Cvec3(0, 0, 0));
+
+// CHANGE
+// ArcballRbt
+static RigTForm g_arcballRbt(Cvec3(0, 0, 0));
+static Cvec3f g_arcballColor(0.5, 0.5, 0.5);
 
 // CHANGE
 // Replaced Matrix4 by RigTForm
@@ -234,9 +248,25 @@ static void initCubes() {
   makeCube(1, vtx.begin(), idx.begin());
   g_cube.reset(new Geometry(&vtx[0], &idx[0], vbLen, ibLen));
 
-  // TODO: Add another cube.
   makeCube(1, vtx.begin(), idx.begin());
   g_cube_1.reset(new Geometry(&vtx[0], &idx[0], vbLen, ibLen));
+}
+
+// CHANGE
+// initialize sphere geometry to draw arcball.
+static void initArcball() {
+  int ibLen, vbLen;
+  int slices = 25;
+  int stacks = 25;
+  getSphereVbIbLen(slices, stacks, vbLen, ibLen);
+
+  // Temporary storage for cube geometry
+  vector<VertexPN> vtx(vbLen);
+  vector<unsigned short> idx(ibLen);
+
+
+  makeSphere(1, slices, stacks, vtx.begin(), idx.begin());
+  g_arcball.reset(new Geometry(&vtx[0], &idx[0], vbLen, ibLen));
 }
 
 // takes a projection matrix and send to the the shaders
@@ -272,6 +302,12 @@ static void updateFrustFovY() {
   }
 }
 
+static Matrix4 makeProjectionMatrix() {
+  return Matrix4::makeProjection(
+      g_frustFovY, g_windowWidth / static_cast<double>(g_windowHeight),
+      g_frustNear, g_frustFar);
+}
+
 // CHANGE
 // Replaced Matrix4 by RigTForm
 // Does a RBT Q to object O with respect to A
@@ -289,12 +325,6 @@ static RigTForm makeMixedFrame(const RigTForm &O, const RigTForm &E) {
   return transFact(O) * linFact(E);
 }
 
-static Matrix4 makeProjectionMatrix() {
-  return Matrix4::makeProjection(
-      g_frustFovY, g_windowWidth / static_cast<double>(g_windowHeight),
-      g_frustNear, g_frustFar);
-}
-
 // CHANGE
 // Replaced Matrix4 by RigTForm
 // Returns the current eyeRbt based on the active view.
@@ -307,6 +337,78 @@ static RigTForm getEyeRbt() {
   case SKY:
   default:
     return g_skyRbt;
+  }
+}
+
+// Returns true if active object and eye are the SKY camera wrt world-sky frame.
+static bool isWorldSkyFrameActive() {
+  return (g_activeObject == SKY && g_activeEye == SKY && g_worldSkyFrame) ? true : false;
+}
+
+// Returns true if active object is a cube and isn't wrt to itself.
+static bool isCubeActive() {
+  return (g_activeObject < 2 && g_activeObject != g_activeEye) ? true : false;
+}
+
+// CHANGE
+// Arcball interface will come into place under two conditions only:
+// 1. Active object and eye are the SKY camera wrt world-sky frame.
+// 2. Active object is a cube and isn't wrt to itself.
+// Returns true if arcball should be active, false otherwise.
+static bool isArcballActive() {
+  return isWorldSkyFrameActive() || isCubeActive() ? true : false;
+}
+
+// CHANGE
+// Arcball Rbt will be based on the current case:
+// 1. Center is the world's origin
+// 2. Center is the cube being manipulated.
+// Returns the RBT of arcball.
+static RigTForm getArcballRbt() {
+  // Active object is a cube and isn't wrt to itself.
+  if (isCubeActive()) {
+    return g_objectRbt[g_activeObject];
+  }
+  // Active object and eye are the SKY camera wrt world-sky frame.
+  return g_worldRbt;
+}
+
+// CHANGE
+// Returns ArcballRotation.
+static RigTForm getArcballRotation(int current_x, int current_y) {
+  const RigTForm eyeRbt = getEyeRbt();
+  const RigTForm object = getArcballRbt();
+
+  // Get the sphere's center in Screen coordinates
+  Cvec2 screenSpaceCoordinates = getScreenSpaceCoord(
+    (inv(eyeRbt) * object).getTranslation(),
+    makeProjectionMatrix(),
+    g_frustNear,
+    g_frustFovY,
+    g_windowWidth,
+    g_windowHeight
+  );
+
+  Cvec3 sphereCenter = Cvec3(screenSpaceCoordinates, 0);
+
+  // point1[0] = x - cx; point1[1] = y - cy;
+  Cvec3 point1 = Cvec3(g_mouseClickX, g_mouseClickY, 0) - sphereCenter;
+
+  // point2[0] = x - cx; point2[1] = y - cy;
+  Cvec3 point2 = Cvec3(current_x, current_y, 0) - sphereCenter;
+
+  // z = sqrt((radius)^2 - (x - cx)^2 - (y - cy)^2)
+  Cvec3 vector1 = normalize(Cvec3(point1[0], point1[1], sqrt(max(0.0, pow(g_arcballScreenRadius, 2) - pow(point1[0], 2) - pow(point1[1], 2)))));
+
+  // z = sqrt((radius)^2 - (x - cx)^2 - (y - cy)^2)
+  Cvec3 vector2 = normalize(Cvec3(point2[0], point2[1], sqrt(max(0.0, pow(g_arcballScreenRadius, 2) - pow(point2[0], 2) - pow(point2[1], 2)))));
+
+
+  if (isWorldSkyFrameActive()) {
+    return RigTForm(Quat(0, vector1 * -1.0) * Quat(0, vector2));
+  }
+  else {
+    return RigTForm(Quat(0, vector2) * Quat(0, vector1 * -1.0));
   }
 }
 
@@ -360,6 +462,32 @@ static void drawStuff() {
                    g_objectColors[1][2]);
 
   g_cube_1->draw(curSS);
+
+  // draw arcball
+  // ==========
+  //
+  if (isArcballActive()) {
+    if (!g_mouseMClickButton && !(g_mouseLClickButton && g_mouseRClickButton) && !(g_spaceDown)) {
+      g_arcballScale = getScreenToEyeScale(
+           (inv(getEyeRbt()) * getArcballRbt()).getTranslation()[2],
+           g_frustFovY,
+           g_windowHeight
+        );
+    }
+
+    // draw wireframe
+    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    const double scalingValue = g_arcballScale * g_arcballScreenRadius;
+    const Matrix4 scale = Matrix4::makeScale(Cvec3(scalingValue, scalingValue, scalingValue));
+    MVM = rigTFormToMatrix(invEyeRbt * getArcballRbt()) * scale;
+    NMVM = normalMatrix(MVM);
+    sendModelViewNormalMatrix(curSS, MVM, NMVM);
+    safe_glUniform3f(curSS.h_uColor, g_arcballColor[0], g_arcballColor[1],
+                     g_arcballColor[2]);
+    g_arcball->draw(curSS);
+
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+  }
 }
 
 
@@ -385,7 +513,7 @@ static void manipulateObjects(RigTForm &Q) {
   else {
     RigTForm world;
     // World-sky frame
-    if (g_worldSky) {
+    if (g_worldSkyFrame) {
       RigTForm A = makeMixedFrame(g_worldRbt, g_skyRbt);
       g_skyRbt = doQtoOwrtA(Q, g_skyRbt, A);
     }
@@ -467,6 +595,9 @@ static void reshape(const int w, const int h) {
   g_windowHeight = h;
   glViewport(0, 0, w, h);
   cerr << "Size of window is now " << w << "x" << h << endl;
+
+  g_arcballScreenRadius = 0.25 * min(g_windowWidth, g_windowHeight);
+
   updateFrustFovY();
   glutPostRedisplay();
 }
@@ -480,8 +611,11 @@ static void reshape(const int w, const int h) {
 ///  a "mouse move" event is triggered and this callback is
 ///  called to handle the event.
 static void motion(const int x, const int y) {
-  double dx = x - g_mouseClickX;
-  double dy = g_windowHeight - y - 1 - g_mouseClickY;
+  int current_x = x;
+  int current_y = g_windowHeight - y - 1;
+
+  double dx = current_x - g_mouseClickX;
+  double dy = current_y - g_mouseClickY;
 
   // variables used to invert the required values.
   // Applied to rotation and trans.
@@ -492,21 +626,33 @@ static void motion(const int x, const int y) {
 
   if ((g_activeObject < 2) && (g_activeObject != g_activeEye)) {
     factor2 = 1;
-  } else if (g_activeEye == SKY && g_activeObject == SKY && g_worldSky) {
+  } else if (g_activeEye == SKY && g_activeObject == SKY && g_worldSkyFrame) {
     factor = -1;
     factor2 = 1;
   }
 
+  // Use g_arcballScale to scale translation when using arcball only.
+ double translateFactor;
+ if (isArcballActive()) {
+   translateFactor = g_arcballScale;
+ } else {
+   translateFactor = 0.01;
+ }
+
   RigTForm m;
   // left button down?
   if (g_mouseLClickButton && !g_mouseRClickButton && !g_spaceDown) {
-    m = RigTForm(Quat::makeXRotation(factor2 * factor * -dy) *
-        Quat::makeYRotation(factor2 * factor * dx));
-
+    if (isArcballActive()) {
+      m = getArcballRotation(current_x, current_y);
+    }
+    else {
+      m = RigTForm(Quat::makeXRotation(factor2 * factor * -dy) *
+          Quat::makeYRotation(factor2 * factor * dx));
+    }
   }
   // right button down?
   else if (g_mouseRClickButton && !g_mouseLClickButton) {
-    m = RigTForm(Cvec3(factor * dx, factor * dy, 0) * 0.01);
+    m = RigTForm(Cvec3(factor * dx, factor * dy, 0) * translateFactor);
   }
   // middle or (left and right, or left + space)
   // button down?
@@ -514,8 +660,9 @@ static void motion(const int x, const int y) {
              (g_mouseLClickButton && g_mouseRClickButton) ||
              (g_mouseLClickButton && !g_mouseRClickButton &&
               g_spaceDown)) {
-    m = RigTForm(Cvec3(0, 0, factor * -dy) * 0.01);
+    m = RigTForm(Cvec3(0, 0, factor * -dy) * translateFactor);
   }
+
 
   // we always redraw if we changed the scene
   if (g_mouseClickDown) {
@@ -523,8 +670,8 @@ static void motion(const int x, const int y) {
     glutPostRedisplay();
   }
 
-  g_mouseClickX = x;
-  g_mouseClickY = g_windowHeight - y - 1;
+  g_mouseClickX = current_x;
+  g_mouseClickY = current_y;
 }
 
 // _____________________________________________________
@@ -551,6 +698,10 @@ static void mouse(const int button, const int state, const int x, const int y) {
 
   g_mouseClickDown =
       g_mouseLClickButton || g_mouseRClickButton || g_mouseMClickButton;
+
+  // CHANGE
+  // Call glutPostRedisplay()
+  glutPostRedisplay();
 }
 
 static void keyboardUp(const unsigned char key, const int x, const int y) {
@@ -607,8 +758,8 @@ static void keyboard(const unsigned char key, const int x, const int y) {
     break;
   case 'm':
     if (g_activeEye == SKY && g_activeObject == SKY) {
-      g_worldSky = !g_worldSky;
-      if (g_worldSky) {
+      g_worldSkyFrame = !g_worldSkyFrame;
+      if (g_worldSkyFrame) {
         cout << "World-sky view is active." << '\n';
       } else {
         cout << "Sky-sky view is active." << '\n';
@@ -674,6 +825,7 @@ static void initShaders() {
 static void initGeometry() {
   initGround();
   initCubes();
+  initArcball();
 }
 
 int main(int argc, char *argv[]) {
