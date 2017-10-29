@@ -1,5 +1,9 @@
 # Assignment 3
 
+## Run Instructions
+    $ make
+    $ ./main
+
 ## Changes
 ### General
 - Moved all .h files into headers folder.
