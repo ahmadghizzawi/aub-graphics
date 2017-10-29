@@ -24,19 +24,23 @@
 using namespace std; // for string, vector, iostream, smart pointers, and other
                      // standard C++ stuff
 
-// G L O B A L S ///////////////////////////////////////////////////
-
-// To complete the assignment you need to edit the shader files that get loaded
-// ----------------------------------------------------------------------------
-
-static const float g_frustMinFov = 60.0; // A minimal of 60 degree field of view
-static float g_frustFovY =
-    g_frustMinFov; // FOV in y direction (updated by updateFrustFovY)
-
-static const float g_frustNear = -0.1;  // near plane
-static const float g_frustFar = -50.0;  // far plane
-static const float g_groundY = -2.0;    // y coordinate of the ground
-static const float g_groundSize = 10.0; // half the ground length
+// _____________________________________________________
+//|                                                     |
+//|  GLOBALS                                            |
+//|_____________________________________________________|
+///
+// A minimal of 60 degree field of view
+static const float g_frustMinFov = 60.0;
+// FOV in y direction (updated by updateFrustFovY)
+static float g_frustFovY = g_frustMinFov;
+// near plane
+static const float g_frustNear = -0.1;
+// far plane
+static const float g_frustFar = -50.0;
+// y coordinate of the ground
+static const float g_groundY = -2.0;
+// half the ground length
+static const float g_groundSize = 10.0;
 
 static int g_windowWidth = 512;
 static int g_windowHeight = 512;
@@ -46,13 +50,15 @@ static bool g_spaceDown = false; // space state, for middle mouse emulation
 static int g_mouseClickX, g_mouseClickY; // coordinates for mouse click event
 static int g_activeShader = 0;
 
-static int g_activeObject = 0;
-static int g_activeEye = 2;
-static bool g_worldSky = true;
-
+// Constants that act as object ids
 static const int OBJECT0 = 0;
 static const int OBJECT1 = 1;
 static const int SKY = 2;
+
+// Default view and object.
+static int g_activeObject = OBJECT0;
+static int g_activeEye = SKY;
+static bool g_worldSky = true;
 
 /*
 For communication with shaders.
@@ -199,8 +205,11 @@ static RigTForm g_objectRbt[2] = {RigTForm(Cvec3(-0.75, 0, 0)),
 
 static Cvec3f g_objectColors[2] = {Cvec3f(1, 0, 0), Cvec3f(0, 1, 0)};
 
-///////////////// END OF G L O B A L S
-/////////////////////////////////////////////////////
+// _____________________________________________________
+//|                                                     |
+//|  END OF GLOBALS                                     |
+//|_____________________________________________________|
+///
 
 static void initGround() {
   // A x-z plane at y = g_groundY of dimension [-g_groundSize, g_groundSize]^2
