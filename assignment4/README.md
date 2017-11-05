@@ -10,7 +10,10 @@
 - Added the provided helper headers (quat.h, rigtform, arcball.h).
 
 ### Tasks
-- [x] All tasks were implemented as described in the document.
+#### Task 1
+- Renamed g_objectRbt and g_skyRbt to g_robotNode and g_skyNode
+
+
 
 ### Known Issues:
 - When using the spacebar + right mouse click combo to translate in the Z-directions,

@@ -10,7 +10,7 @@ ifeq ($(OS), Linux)
   LIBS += -lGL -lGLU -lglut -lGLEW
 endif
 
-ifeq ($(OS), Darwin) # MacOS
+ifeq ($(OS), Darwin) # Assume OS X
   CPPFLAGS += -D__MAC__ -stdlib=libc++
   LDFLAGS += -framework GLUT -framework OpenGL
 endif
@@ -25,7 +25,7 @@ endif
 
 CXX = g++ -Wno-deprecated-declarations
 
-OBJ = $(BASE).o ppm.o glsupport.o
+OBJ = $(BASE).o ppm.o glsupport.o scenegraph.o picker.o
 
 $(BASE): $(OBJ)
 	$(LINK.cpp) -o $@ $^ $(LIBS)
