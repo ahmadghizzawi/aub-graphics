@@ -18,3 +18,5 @@
 ### Known Issues:
 - When using the spacebar + right mouse click combo to translate in the Z-directions,
   the behavior is not the expected one.
+
+- When picking Sky using picker, an error occurs.

@@ -66,7 +66,6 @@ static const int OBJECT1 = 1;
 static const int SKY = 2;
 
 // Default view and object.
-static int g_activeObject = OBJECT0;
 static int g_activeEye = SKY;
 static bool g_worldSkyFrame = true;
 
@@ -172,7 +171,10 @@ static const Cvec3 g_light1(2.0, 3.0, 14.0), g_light2(-2, -3.0, -5.0);
 
 static shared_ptr<SgRootNode> g_world;
 static shared_ptr<SgRbtNode> g_skyNode, g_groundNode, g_robot1Node, g_robot2Node;
+// current picked object. Default is sky
 static shared_ptr<SgRbtNode> g_currentPickedRbtNode;
+// current view. Default is sky
+static shared_ptr<SgRbtNode> g_currentView;
 
 /* rigid body translation*/
 
@@ -290,8 +292,7 @@ static bool isWorldSkyFrameActive() {
 
 // Returns true if active object is a cube and isn't wrt to itself.
 static bool isCubeActive() {
-  // TODO: FIX
-  return ((g_currentPickedRbtNode == g_robot1Node || g_currentPickedRbtNode == g_robot2Node));
+  return g_currentPickedRbtNode != g_skyNode && g_currentPickedRbtNode != g_currentView;
 }
 
 // Arcball interface will come into place under two conditions only:
@@ -309,7 +310,7 @@ static bool isArcballActive() {
 static RigTForm getArcballRbt() {
   // Active object is a cube and isn't wrt to itself.
   if (isCubeActive()) {
-    return g_currentPickedRbtNode->getRbt();
+    return getPathAccumRbt(g_world, g_currentPickedRbtNode);
   }
   // Active object and eye are the SKY camera wrt world-sky frame.
   return g_world->getRbt();
@@ -404,7 +405,7 @@ static void drawStuff(const ShaderState& curSS, bool picking) {
     glFlush();
     g_currentPickedRbtNode = picker.getRbtNodeAtXY(g_mouseClickX, g_mouseClickY);
     if (g_currentPickedRbtNode == g_groundNode)
-      g_currentPickedRbtNode = shared_ptr<SgRbtNode>();   // set to NULL
+      g_currentPickedRbtNode = g_skyNode;
   }
 
   // draw arcball
@@ -448,62 +449,52 @@ static void pick() {
 }
 
 // Manipulates objects' RBTs based on the active objects and eye.
-// static void manipulateObjects(RigTForm &Q) {
-//
-//   // Active eye is sky and active object is a cube.
-//   if ((g_activeObject < 2) && g_activeEye == SKY) {
-//     RigTForm A = makeMixedFrame(g_robotNode[g_activeObject], g_skyNode);
-//     g_robotNode[g_activeObject] = doQtoOwrtA(Q, g_robotNode[g_activeObject], A);
-//   }
-//   // Active eye and object are cubes.
-//   else if (g_activeObject < 2 && g_activeEye < 2) {
-//     // TODO: should be for i and j
-//     RigTForm A =
-//         makeMixedFrame(g_robotNode[g_activeObject], getEyeRbt());
-//     g_robotNode[g_activeObject] = doQtoOwrtA(Q, g_robotNode[g_activeObject], A);
-//   }
-//   // Active eye and object is sky.
-//   else {
-//     RigTForm world;
-//     // World-sky frame
-//     if (g_worldSkyFrame) {
-//       RigTForm A = makeMixedFrame(g_worldRbt, g_skyNode);
-//       g_skyNode = doQtoOwrtA(Q, g_skyNode, A);
-//     }
-//     // Sky-sky
-//     else {
-//       g_skyNode = g_skyNode * Q;
-//     }
-//   }
-// }
+static void manipulateObjects(RigTForm &Q) {
 
-static void printActiveView(int activeView) {
-  switch (activeView) {
-  case SKY:
-    std::cout << "Sky camera frame is active." << '\n';
-    break;
-  case OBJECT0:
-    std::cout << "Object 0 frame is active." << '\n';
-    break;
-  case OBJECT1:
-    std::cout << "Object 1 frame is active." << '\n';
-    break;
+  // Active eye is sky and active object is a cube.
+  if (isCubeActive() && g_activeEye == SKY) {
+    RigTForm A = makeMixedFrame(g_currentPickedRbtNode->getRbt(), g_currentView->getRbt());
+    g_currentPickedRbtNode->setRbt(doQtoOwrtA(Q, g_currentPickedRbtNode->getRbt(), A));
+  }
+  // Active eye and object are cubes.
+  else if (isCubeActive()) {
+    RigTForm A =
+        makeMixedFrame(g_currentPickedRbtNode->getRbt(), g_currentView->getRbt());
+    g_currentPickedRbtNode->setRbt(doQtoOwrtA(Q, g_currentPickedRbtNode->getRbt(), A));
+  }
+  // Active eye and object is sky.
+  else {
+    RigTForm world;
+    // World-sky frame
+    if (g_worldSkyFrame) {
+      RigTForm A = makeMixedFrame(g_world->getRbt(), g_skyNode->getRbt());
+      g_skyNode->setRbt(doQtoOwrtA(Q, g_skyNode->getRbt(), A));
+    }
+    // Sky-sky
+    else {
+      g_skyNode->setRbt(g_skyNode->getRbt() * Q);
+    }
   }
 }
 
-static void printActiveObject(int activeObject) {
-  switch (activeObject) {
+static void toggleActiveView() {
+  g_activeEye++;
+  if (g_activeEye > 2) {
+    g_activeEye = 0;
+  }
+  switch (g_activeEye) {
+  case SKY:
+    std::cout << "Sky camera view is active." << '\n';
+    g_currentView = g_skyNode;
+    break;
   case OBJECT0:
-    cout << "Object 0 is active." << '\n';
+    std::cout << "Robot 1 view is active." << '\n';
+    g_currentView = g_robot1Node;
     break;
   case OBJECT1:
-    cout << "Object 1 is active." << '\n';
+    std::cout << "Robot 2 view is active." << '\n';
+    g_currentView = g_robot2Node;
     break;
-  case SKY:
-    cout << "Sky is now active." << '\n';
-    break;
-  default:
-    cout << "Object 0 is active." << '\n';
   }
 }
 
@@ -577,9 +568,9 @@ static void motion(const int x, const int y) {
   // Applied to rotation only.
   int factor2 = -1;
 
-  if ((g_activeObject < 2) && (g_activeObject != g_activeEye)) {
+  if (isCubeActive()) {
     factor2 = 1;
-  } else if (g_activeEye == SKY && g_activeObject == SKY && g_worldSkyFrame) {
+  } else if (isWorldSkyFrameActive()) {
     factor = -1;
     factor2 = 1;
   }
@@ -619,8 +610,7 @@ static void motion(const int x, const int y) {
 
   // we always redraw if we changed the scene
   if (g_mouseClickDown) {
-    RigTForm A =  makeMixedFrame(g_currentPickedRbtNode->getRbt(), getEyeRbt());
-    g_currentPickedRbtNode->setRbt(doQtoOwrtA(m, g_currentPickedRbtNode->getRbt(), A));
+    manipulateObjects(m);
 
     glutPostRedisplay();
   }
@@ -703,19 +693,15 @@ static void keyboard(const unsigned char key, const int x, const int y) {
     g_activeShader ^= 1;
     break;
   case 'v':
-    g_activeEye++;
-    if (g_activeEye > 2) {
-      g_activeEye = 0;
-    }
-    printActiveView(g_activeEye);
+    toggleActiveView();
     break;
   case 'm':
-    if (g_activeEye == SKY && g_activeObject == SKY) {
+    if (g_activeEye == SKY && g_currentView == g_skyNode) {
       g_worldSkyFrame = !g_worldSkyFrame;
-      if (g_worldSkyFrame) {
-        cout << "World-sky view is active." << '\n';
+      if (isWorldSkyFrameActive()) {
+        cout << "World-sky frame is active." << '\n';
       } else {
-        cout << "Sky-sky view is active." << '\n';
+        cout << "Sky-sky frame is active." << '\n';
       }
     }
     break;
@@ -791,9 +777,12 @@ static void constructRobot(shared_ptr<SgTransformNode> base, const Cvec3& color)
                ARM_THICK = 0.25,
                TORSO_LEN = 1.5,
                TORSO_THICK = 0.25,
-               TORSO_WIDTH = 1;
-  const int NUM_JOINTS = 3,
-            NUM_SHAPES = 3;
+               TORSO_WIDTH = 1,
+               HEAD_RAD = 0.30,
+               LEG_LEN = 0.7,
+               LEG_THICK = 0.25;
+  const int NUM_JOINTS = 10,
+            NUM_SHAPES = 10;
 
   struct JointDesc {
     int parent;
@@ -804,6 +793,13 @@ static void constructRobot(shared_ptr<SgTransformNode> base, const Cvec3& color)
     {-1}, // torso
     {0,  TORSO_WIDTH/2, TORSO_LEN/2, 0}, // upper right arm
     {1,  ARM_LEN, 0, 0}, // lower right arm
+    {0, 0, TORSO_LEN/2, 0}, // head
+    {0,  -TORSO_WIDTH/2, TORSO_LEN/2, 0}, // upper left arm
+    {4,  -ARM_LEN, 0, 0}, // lower left arm
+    {0,  TORSO_WIDTH/2, -TORSO_LEN/2, 0}, // upper right leg
+    {6,  0, -LEG_LEN, 0}, // lower right leg
+    {0,  -TORSO_WIDTH/2, -TORSO_LEN/2, 0}, // upper left leg
+    {8,  0, -LEG_LEN, 0} // lower left leg
   };
 
   struct ShapeDesc {
@@ -816,6 +812,13 @@ static void constructRobot(shared_ptr<SgTransformNode> base, const Cvec3& color)
     {0, 0,         0, 0, TORSO_WIDTH, TORSO_LEN, TORSO_THICK, g_cube}, // torso
     {1, ARM_LEN/2, 0, 0, ARM_LEN, ARM_THICK, ARM_THICK, g_cube}, // upper right arm
     {2, ARM_LEN/2, 0, 0, ARM_LEN, ARM_THICK, ARM_THICK, g_cube}, // lower right arm
+    {3, 0, HEAD_RAD, 0, HEAD_RAD, HEAD_RAD, HEAD_RAD, g_arcball}, // head
+    {4, -ARM_LEN/2, 0, 0, ARM_LEN, ARM_THICK, ARM_THICK, g_cube}, // upper left arm
+    {5, -ARM_LEN/2, 0, 0, ARM_LEN, ARM_THICK, ARM_THICK, g_cube}, // lower left arm
+    {6, 0, -LEG_LEN/2, 0, LEG_THICK, LEG_LEN, LEG_THICK, g_cube}, // upper right Leg
+    {7, 0, -LEG_LEN/2, 0, LEG_THICK, LEG_LEN, LEG_THICK, g_cube}, // lower right Leg
+    {8, 0, -LEG_LEN/2, 0, LEG_THICK, LEG_LEN, LEG_THICK, g_cube}, // upper left Leg
+    {9, 0, -LEG_LEN/2, 0, LEG_THICK, LEG_LEN, LEG_THICK, g_cube}, // lower left Leg
   };
 
   shared_ptr<SgTransformNode> jointNodes[NUM_JOINTS];
@@ -851,7 +854,9 @@ static void initScene() {
   g_robot1Node.reset(new SgRbtNode(RigTForm(Cvec3(-2, 1, 0))));
   g_robot2Node.reset(new SgRbtNode(RigTForm(Cvec3(2, 1, 0))));
 
+  // default selection and view
   g_currentPickedRbtNode = g_skyNode;
+  g_currentView = g_skyNode;
 
   constructRobot(g_robot1Node, Cvec3(1, 0, 0)); // a Red robot
   constructRobot(g_robot2Node, Cvec3(0, 0, 1)); // a Blue robot
