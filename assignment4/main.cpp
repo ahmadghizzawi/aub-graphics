@@ -40,7 +40,7 @@ using namespace std; // for string, vector, iostream, smart pointers, and other
 //|_____________________________________________________|
 ///
 // A minimal of 60 degree field of view
-static const float g_frustMinFov = 60.0;
+static const float g_frustMinFov = 30.0;
 // FOV in y direction (updated by updateFrustFovY)
 static float g_frustFovY = g_frustMinFov;
 // near plane
@@ -254,6 +254,7 @@ static void updateFrustFovY() {
 }
 
 static Matrix4 makeProjectionMatrix() {
+  Matrix4 test;
   return Matrix4::makeProjection(
       g_frustFovY, g_windowWidth / static_cast<double>(g_windowHeight),
       g_frustNear, g_frustFar);
@@ -388,16 +389,13 @@ static void drawStuff(const ShaderState& curSS, bool picking) {
 
 
 
-  // draw cubes, ground, and arball
+  // draw robots, and ground
   // ==========
   //
 
   if (!picking) {
       Drawer drawer(invEyeRbt, curSS);
       g_world->accept(drawer);
-
-
-
   }
   else {
     Picker picker(invEyeRbt, curSS);
@@ -791,15 +789,15 @@ static void constructRobot(shared_ptr<SgTransformNode> base, const Cvec3& color)
 
   JointDesc jointDesc[NUM_JOINTS] = {
     {-1}, // torso
-    {0,  TORSO_WIDTH/2, TORSO_LEN/2, 0}, // upper right arm
-    {1,  ARM_LEN, 0, 0}, // lower right arm
-    {0, 0, TORSO_LEN/2, 0}, // head
+    {0,  TORSO_WIDTH/2, TORSO_LEN/2, 0},  // upper right arm
+    {1,  ARM_LEN, 0, 0},                  // lower right arm
+    {0, 0, TORSO_LEN/2, 0},               // head
     {0,  -TORSO_WIDTH/2, TORSO_LEN/2, 0}, // upper left arm
-    {4,  -ARM_LEN, 0, 0}, // lower left arm
+    {4,  -ARM_LEN, 0, 0},                 // lower left arm
     {0,  TORSO_WIDTH/2, -TORSO_LEN/2, 0}, // upper right leg
-    {6,  0, -LEG_LEN, 0}, // lower right leg
-    {0,  -TORSO_WIDTH/2, -TORSO_LEN/2, 0}, // upper left leg
-    {8,  0, -LEG_LEN, 0} // lower left leg
+    {6,  0, -LEG_LEN, 0},                 // lower right leg
+    {0,  -TORSO_WIDTH/2, -TORSO_LEN/2, 0},// upper left leg
+    {8,  0, -LEG_LEN, 0}                  // lower left leg
   };
 
   struct ShapeDesc {

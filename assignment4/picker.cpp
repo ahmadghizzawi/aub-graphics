@@ -12,19 +12,18 @@ Picker::Picker(const RigTForm& initialRbt, const ShaderState& curSS)
   , srgbFrameBuffer_(true) {}
 
 bool Picker::visit(SgTransformNode& node) {
-  // TODO
+  // Push back a shared_ptr of the passed node onto the stack.
   nodeStack_.push_back(node.shared_from_this());
   return drawer_.visit(node);
 }
 
 bool Picker::postVisit(SgTransformNode& node) {
-  // TODO
+  // Pop the node from the back of the stack.
   nodeStack_.pop_back();
   return drawer_.postVisit(node);
 }
 
 bool Picker::visit(SgShapeNode& node) {
-  // TODO
   // increment id counter
   idCounter_++;
   // Get the parent node (which should be an SgRbtNode object)
@@ -48,8 +47,10 @@ bool Picker::postVisit(SgShapeNode& node) {
 shared_ptr<SgRbtNode> Picker::getRbtNodeAtXY(int x, int y) {
   // TODO
   PackedPixel image;
+  // Takes a snapshot of a single pixel from the current buffer at the provided
+  // x/y coordinates
   glReadPixels(x, y, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, &image);
-
+  // Search the map for the node coupled with the id retrieved from the selected color.
   return find(colorToId(image));
 }
 

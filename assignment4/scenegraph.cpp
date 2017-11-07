@@ -34,9 +34,7 @@ protected:
   SgTransformNode& target_;
   bool found_;
 public:
-  RbtAccumVisitor(SgTransformNode& target)
-    : target_(target)
-    , found_(false) {}
+  RbtAccumVisitor(SgTransformNode& target) : target_(target) , found_(false) {}
 
   const RigTForm getAccumulatedRbt(int offsetFromStackTop = 0) {
     // TODO
