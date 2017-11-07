@@ -66,6 +66,8 @@ When visiting a shape node, we applied the following snippet:
       return drawer_.visit(node);
     }
 
+We also implemented all the TODO functionality described in Task 2 description.
+
 ### Task 3: Transforming
 We implemented the TODO functionality inside the RbtAccumVisitor. Here is a snippet of
 the visit function of the RbtAccumVisitor that we implemented:
@@ -113,8 +115,9 @@ Also, we tuned the Arcball interface so that it works flawlessly. Here is the co
     }
 
 ### Task 4: Building the robot.
-We constructed a robot that included the listed parts. Here is the code snippet
-that we wrote to do this (taken from constructRobot function in main.cpp):
+We constructed a robot that includes a head, left/right upper and lower arms,
+and left/right upper and lower legs. Here is the code snippet
+that we wrote to build the robot (taken from constructRobot function in main.cpp):
 
     ShapeDesc shapeDesc[NUM_SHAPES] = {
       {0, 0,         0, 0, TORSO_WIDTH, TORSO_LEN, TORSO_THICK, g_cube}, // torso
