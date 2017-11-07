@@ -1,4 +1,6 @@
-# Assignment 4
+# CMPS385: Assignment 4
+## Authors:
+Ahmad Ghizzawi and Chukri Soueidi.  
 
 ## Run Instructions
     $ make
@@ -6,23 +8,109 @@
 
 ## Changes
 ### Task 1
-- Integrated the code in asst4-snippets.cpp as described in the document.
+We integrated the code from asst4-snippets.cpp as described in the document.
+This snippet shows how we are using scenegraph to draw:
+
+    static void drawStuff(const ShaderState& curSS, bool picking) {
+      .
+      .
+      .
+      // draw robots, and ground
+      // ==========
+      //
+
+      if (!picking) {
+          Drawer drawer(invEyeRbt, curSS);
+          g_world->accept(drawer);
+      }
+      else {
+        Picker picker(invEyeRbt, curSS);
+        g_world->accept(picker);
+        glFlush();
+        g_currentPickedRbtNode = picker.getRbtNodeAtXY(g_mouseClickX, g_mouseClickY);
+        if (g_currentPickedRbtNode == g_groundNode)
+          g_currentPickedRbtNode = g_skyNode;
+      }
+
+      // draw arcball
+      // ==========
+      //
+      if (isArcballActive()) {
+          if (!g_mouseMClickButton && !(g_mouseLClickButton && g_mouseRClickButton) && !(g_spaceDown)) {
+            g_arcballScale = getScreenToEyeScale(
+                 (inv(getEyeRbt()) * getArcballRbt()).getTranslation()[2],
+                 g_frustFovY,
+                 g_windowHeight
+              );
+          }
+
+          drawArcball(curSS, invEyeRbt);
+      }
+    }
 ### Task 2: Picker
 When visiting a shape node, we applied the following snippet:
 
-    // increment id counter
-    idCounter_++;
-    // Get the parent node (which should be an SgRbtNode object)
-    shared_ptr<SgRbtNode> parent = dynamic_pointer_cast<SgRbtNode>(nodeStack_.back());
-    // Associate the id with the parent
-    addToMap(idCounter_, parent);
-    // Retrieve the color of the object based on the id
-    Cvec3 objectColor = Picker::idToColor(idCounter_);
-    // Set the uniform variable to have the given color before drawing.
-    safe_glUniform3f(drawer_.getCurSS().h_uIdColor, objectColor[0], objectColor[1],
-                     objectColor[2]);
+    bool Picker::visit(SgShapeNode& node) {
+      // increment id counter
+      idCounter_++;
+      // Get the parent node (which should be an SgRbtNode object)
+      shared_ptr<SgRbtNode> parent = dynamic_pointer_cast<SgRbtNode>(nodeStack_.back());
+      // Associate the id with the parent
+      addToMap(idCounter_, parent);
+      // Retrieve the color of the object based on the id
+      Cvec3 objectColor = Picker::idToColor(idCounter_);
+      // Set the uniform variable to have the given color before drawing.
+      safe_glUniform3f(drawer_.getCurSS().h_uIdColor, objectColor[0], objectColor[1],
+                       objectColor[2]);
+
+      return drawer_.visit(node);
+    }
 
 ### Task 3: Transforming
+We implemented the TODO functionality inside the RbtAccumVisitor. Here is a snippet of
+the visit function of the RbtAccumVisitor that we implemented:
+
+    virtual bool visit(SgTransformNode& node) {
+      // TODO
+      if (rbtStack_.empty()) {
+        rbtStack_.push_back(node.getRbt());
+      } else {
+        rbtStack_.push_back(rbtStack_.back() * node.getRbt());
+      }
+
+      return !(node == target_);
+    }
+
+We also migrated our code to use getPathAccumRbt() functions for retrieving the
+matrices required to be able to view from any node. Here is a snippet of the code that does that:
+
+    // Returns the current eyeRbt based on the active view.
+    static RigTForm getEyeRbt() {
+      switch (g_activeEye) {
+      case OBJECT0:
+        return getPathAccumRbt(g_world, g_robot1Node);
+      case OBJECT1:
+        return getPathAccumRbt(g_world, g_robot2Node);
+      case SKY:
+      default:
+        return getPathAccumRbt(g_world, g_skyNode);
+      }
+    }
+
+Also, we tuned the Arcball interface so that it works flawlessly. Here is the code that does that:
+
+    // Arcball Rbt will be based on the current case:
+    // 1. Center is the world's origin
+    // 2. Center is the cube being manipulated.
+    // Returns the RBT of arcball.
+    static RigTForm getArcballRbt() {
+      // Active object is a cube and isn't wrt to itself.
+      if (isCubeActive()) {
+        return getPathAccumRbt(g_world, g_currentPickedRbtNode);
+      }
+      // Active object and eye are the SKY camera wrt world-sky frame.
+      return g_world->getRbt();
+    }
 
 ### Task 4: Building the robot.
 We constructed a robot that included the listed parts. Here is the code snippet
@@ -40,6 +128,7 @@ that we wrote to do this (taken from constructRobot function in main.cpp):
       {8, 0, -LEG_LEN/2, 0, LEG_THICK, LEG_LEN, LEG_THICK, g_cube}, // upper left Leg
       {9, 0, -LEG_LEN/2, 0, LEG_THICK, LEG_LEN, LEG_THICK, g_cube}, // lower left Leg
     };
+
 
     JointDesc jointDesc[NUM_JOINTS] = {
       {-1}, // torso
