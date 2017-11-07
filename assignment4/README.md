@@ -9,6 +9,7 @@
 - Integrated the code in asst4-snippets.cpp as described in the document.
 ### Task 2: Picker
 When visiting a shape node, we applied the following snippet:
+
     // increment id counter
     idCounter_++;
     // Get the parent node (which should be an SgRbtNode object)
@@ -26,6 +27,7 @@ When visiting a shape node, we applied the following snippet:
 ### Task 4: Building the robot.
 We constructed a robot that included the listed parts. Here is the code snippet
 that we wrote to do this (taken from constructRobot function in main.cpp):
+
     ShapeDesc shapeDesc[NUM_SHAPES] = {
       {0, 0,         0, 0, TORSO_WIDTH, TORSO_LEN, TORSO_THICK, g_cube}, // torso
       {1, ARM_LEN/2, 0, 0, ARM_LEN, ARM_THICK, ARM_THICK, g_cube}, // upper right arm
