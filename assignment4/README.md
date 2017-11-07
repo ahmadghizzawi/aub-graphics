@@ -47,8 +47,9 @@ This snippet shows how we are using scenegraph to draw:
           drawArcball(curSS, invEyeRbt);
       }
     }
+
 ### Task 2: Picker
-When visiting a shape node, we applied the following snippet:
+When visiting a shape node, we implemented the following:
 
     bool Picker::visit(SgShapeNode& node) {
       // increment id counter
@@ -64,6 +65,19 @@ When visiting a shape node, we applied the following snippet:
                        objectColor[2]);
 
       return drawer_.visit(node);
+    }
+
+We also called the pick() function provided in the asst4-snippets.cpp file in the bottom of the
+mouse function. Notice that we added a new global boolean variable g_pickObject
+that is set true whenever the key 'p' is clicked, which allows this condition to be executed.
+
+    static void mouse(const int button, const int state, const int x, const int y) {
+      ...
+      // left button down?
+      if (g_mouseLClickButton && !g_mouseRClickButton && !g_spaceDown && g_pickObject) {
+        pick();
+        g_pickObject = false;
+      }
     }
 
 We also implemented all the TODO functionality described in Task 2 description.
@@ -114,6 +128,20 @@ Also, we tuned the Arcball interface so that it works flawlessly. Here is the co
       return g_world->getRbt();
     }
 
+Finally, we updated the way we transform nodes so that we use getPathAccumRbt().
+Here is a small snippet that shows how we did it:
+
+    // Manipulates objects' RBTs based on the active objects and eye.
+    static void manipulateObjects(RigTForm &Q) {
+      ...
+        // Active eye is sky and active object is a cube.
+        if (isCubeActive() && g_activeEye == SKY) {
+          RigTForm A = makeMixedFrame(g_currentPickedRbtNode->getRbt(), g_currentView->getRbt());
+          g_currentPickedRbtNode->setRbt(doQtoOwrtA(Q, g_currentPickedRbtNode->getRbt(), A));
+        }
+      ...
+    }
+    
 ### Task 4: Building the robot.
 We constructed a robot that includes a head, left/right upper and lower arms,
 and left/right upper and lower legs. Here is the code snippet
