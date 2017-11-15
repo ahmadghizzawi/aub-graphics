@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <list>
 
 #ifdef __MAC__
 #include <OpenGL/gl3.h>
@@ -30,7 +31,7 @@
 #include "headers/asstcommon.h"
 #include "headers/drawer.h"
 #include "headers/picker.h"
-
+#include "headers/sgutils.h"
 using namespace std; // for string, vector, iostream, smart pointers, and other
                      // standard C++ stuff
 
@@ -182,6 +183,12 @@ static RigTForm g_arcballRbt(Cvec3(0, 0, 0));
 static Cvec3f g_arcballColor(0.5, 0.5, 0.5);
 
 static Cvec3f g_objectColors[2] = {Cvec3f(1, 0, 0), Cvec3f(0, 1, 0)};
+
+/* Keyframe Animation variables */
+static int g_currentKeyFrameIndex = -1;
+static list<vector<RigTForm> > g_keyFrames;
+
+static vector<shared_ptr<SgRbtNode> > g_rbtNodes;
 
 // _____________________________________________________
 //|                                                     |
@@ -496,6 +503,116 @@ static void toggleActiveView() {
   }
 }
 
+static bool isCurrentFrameDefined() {
+  return g_currentKeyFrameIndex > -1;
+}
+
+static vector<RigTForm> getCurrentKeyFrame(){
+  //Get the RigTform vector from current key frame
+  // initialize iterator at element 0
+  list<vector<RigTForm> >::iterator currentKeyFrame = g_keyFrames.begin();
+  // move iterator to frame at index g_currentKeyFrameIndex
+  advance(currentKeyFrame, g_currentKeyFrameIndex);
+
+  return *currentKeyFrame;
+}
+
+static void copyCurrentKeyFrameToSceneGraph(){
+  int index = 0;
+  // -1 = currentKeyFrame is undefined
+  if (isCurrentFrameDefined()) {
+
+      // Loop over all pointers to SgRbtNodes
+      for ( vector<shared_ptr<SgRbtNode> >::iterator i = g_rbtNodes.begin(); i != g_rbtNodes.end(); i++ ) {
+
+        // initialize iterator at element 0
+        vector<RigTForm>::iterator rigTForm = getCurrentKeyFrame().begin();
+
+        // move iterator to frame at index g_currentKeyFrameIndex
+        advance(rigTForm, index);
+
+        dynamic_pointer_cast<SgRbtNode>(*i)->setRbt(*rigTForm);
+
+        index++;
+      }
+  }
+  else {
+    cout << "Current keyframe is not defined." << '\n';
+  }
+}
+
+static void copySceneGraphToKeyFrame(vector<RigTForm> &newKeyFrame){
+
+  int index = 0;
+  // Loop over all pointers to SgRbtNodes
+  for ( vector<shared_ptr<SgRbtNode> >::iterator rbtNodesIterator = g_rbtNodes.begin(); rbtNodesIterator != g_rbtNodes.end(); rbtNodesIterator++ ) {
+    std::cout << "here 1" << '\n';
+    // initialize iterator at element 0
+    vector<RigTForm>::iterator rigTFormIterator = newKeyFrame.begin();
+    std::cout << "here 2" << '\n';
+
+    // move iterator to frame at index g_currentKeyFrameIndex
+    advance(rigTFormIterator, index);
+    std::cout << "here 3" << '\n';
+    std::cout << &rigTFormIterator << '\n';
+      std::cout << &rbtNodesIterator << '\n';
+
+    (*rigTFormIterator) = (dynamic_pointer_cast<SgRbtNode>(*rbtNodesIterator))->getRbt();
+
+    std::cout << "here 4" << '\n';
+
+    index++;
+  }
+  std::cout << "yalla bye" << '\n';
+
+}
+
+
+
+static void onSpaceClick() {
+  copyCurrentKeyFrameToSceneGraph();
+}
+
+
+
+static void onNClick() {
+  // Create a new keyframe
+  vector<RigTForm> newKeyFrame;
+  // Fill the new keyframe with the current scenegraph
+  copySceneGraphToKeyFrame(newKeyFrame);
+  // Push the new keyframe into the list of keyFrames (g_keyFrames)
+  g_keyFrames.push_back(newKeyFrame);
+
+  // -1 = currentKeyFrame is undefined
+  if (!isCurrentFrameDefined()) {
+    g_currentKeyFrameIndex = 0;
+  }
+  else {
+    g_currentKeyFrameIndex++;
+  }
+}
+
+static void onUClick() {
+  int index = 0;
+  // -1 = currentKeyFrame is undefined
+  if (isCurrentFrameDefined()) {
+
+      //Get the RigTForm vector from current key frame
+      // initialize iterator at element 0
+      list<vector<RigTForm> >::iterator currentKeyFrame = g_keyFrames.begin();
+      // move iterator to frame at index g_currentKeyFrameIndex
+      advance(currentKeyFrame, g_currentKeyFrameIndex);
+
+      copySceneGraphToKeyFrame(*currentKeyFrame);
+  }
+  else {
+    cout << "Current keyframe is not defined." << '\n';
+    onNClick();
+  }
+}
+
+
+
 // _____________________________________________________
 //|                                                     |
 //|  GLUT CALLBACKS                                     |
@@ -708,7 +825,14 @@ static void keyboard(const unsigned char key, const int x, const int y) {
     g_pickObject = true;
     break;
   case ' ':
+    onSpaceClick();
     g_spaceDown = true;
+    break;
+  case 'u':
+    onUClick();
+    break;
+  case 'n':
+    onNClick();
     break;
   }
   glutPostRedisplay();
@@ -863,6 +987,9 @@ static void initScene() {
   g_world->addChild(g_groundNode);
   g_world->addChild(g_robot1Node);
   g_world->addChild(g_robot2Node);
+
+  // initialize rbtNodes pointers
+  dumpSgRbtNodes(g_world, g_rbtNodes);
 }
 
 int main(int argc, char *argv[]) {

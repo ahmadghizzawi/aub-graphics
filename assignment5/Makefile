@@ -11,7 +11,7 @@ ifeq ($(OS), Linux)
 endif
 
 ifeq ($(OS), Darwin) # Assume OS X
-  CPPFLAGS += -D__MAC__ -stdlib=libc++
+  CPPFLAGS += -D__MAC__ -stdlib=libc++ 
   LDFLAGS += -framework GLUT -framework OpenGL
 endif
 

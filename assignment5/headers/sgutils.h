@@ -6,7 +6,7 @@
 #include "scenegraph.h"
 
 struct RbtNodesScanner : public SgNodeVisitor {
-  typedef std::vector<std::tr1::shared_ptr<SgRbtNode> > SgRbtNodes;
+  typedef std::vector<std::shared_ptr<SgRbtNode> > SgRbtNodes;
 
   SgRbtNodes& nodes_;
 
@@ -14,7 +14,7 @@ struct RbtNodesScanner : public SgNodeVisitor {
 
   virtual bool visit(SgTransformNode& node) {
     using namespace std;
-    using namespace tr1;
+
     shared_ptr<SgRbtNode> rbtPtr = dynamic_pointer_cast<SgRbtNode>(node.shared_from_this());
     if (rbtPtr)
       nodes_.push_back(rbtPtr);
@@ -22,7 +22,7 @@ struct RbtNodesScanner : public SgNodeVisitor {
   }
 };
 
-inline void dumpSgRbtNodes(std::tr1::shared_ptr<SgNode> root, std::vector<std::tr1::shared_ptr<SgRbtNode> >& rbtNodes) {
+inline void dumpSgRbtNodes(std::shared_ptr<SgNode> root, std::vector<std::shared_ptr<SgRbtNode> >& rbtNodes) {
   RbtNodesScanner scanner(rbtNodes);
   root->accept(scanner);
 }
