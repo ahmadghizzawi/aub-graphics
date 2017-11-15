@@ -507,7 +507,7 @@ static bool isCurrentFrameDefined() {
   return g_currentKeyFrameIndex > -1;
 }
 
-static vector<RigTForm> getCurrentKeyFrame(){
+static vector<RigTForm> getCurrentKeyFrame() {
   //Get the RigTform vector from current key frame
   // initialize iterator at element 0
   list<vector<RigTForm> >::iterator currentKeyFrame = g_keyFrames.begin();
@@ -517,7 +517,7 @@ static vector<RigTForm> getCurrentKeyFrame(){
   return *currentKeyFrame;
 }
 
-static void copyCurrentKeyFrameToSceneGraph(){
+static void copyCurrentKeyFrameToSceneGraph() {
   int index = 0;
   // -1 = currentKeyFrame is undefined
   if (isCurrentFrameDefined()) {
@@ -541,39 +541,22 @@ static void copyCurrentKeyFrameToSceneGraph(){
   }
 }
 
-static void copySceneGraphToKeyFrame(vector<RigTForm> &newKeyFrame){
+static void copySceneGraphToKeyFrame(vector<RigTForm> &newKeyFrame) {
 
-  int index = 0;
+  newKeyFrame.clear();
   // Loop over all pointers to SgRbtNodes
   for ( vector<shared_ptr<SgRbtNode> >::iterator rbtNodesIterator = g_rbtNodes.begin(); rbtNodesIterator != g_rbtNodes.end(); rbtNodesIterator++ ) {
-    std::cout << "here 1" << '\n';
-    // initialize iterator at element 0
-    vector<RigTForm>::iterator rigTFormIterator = newKeyFrame.begin();
-    std::cout << "here 2" << '\n';
+    newKeyFrame.push_back((*rbtNodesIterator)->getRbt());
 
-    // move iterator to frame at index g_currentKeyFrameIndex
-    advance(rigTFormIterator, index);
-    std::cout << "here 3" << '\n';
-    std::cout << &rigTFormIterator << '\n';
-      std::cout << &rbtNodesIterator << '\n';
-
-    (*rigTFormIterator) = (dynamic_pointer_cast<SgRbtNode>(*rbtNodesIterator))->getRbt();
-
-    std::cout << "here 4" << '\n';
-
-    index++;
   }
-  std::cout << "yalla bye" << '\n';
 
+
+  cout << "Copied scence graph to keyframe." << '\n';
 }
-
-
 
 static void onSpaceClick() {
   copyCurrentKeyFrameToSceneGraph();
 }
-
-
 
 static void onNClick() {
   // Create a new keyframe
@@ -593,13 +576,13 @@ static void onNClick() {
 }
 
 static void onUClick() {
-  int index = 0;
   // -1 = currentKeyFrame is undefined
   if (isCurrentFrameDefined()) {
 
       //Get the RigTForm vector from current key frame
       // initialize iterator at element 0
       list<vector<RigTForm> >::iterator currentKeyFrame = g_keyFrames.begin();
+
       // move iterator to frame at index g_currentKeyFrameIndex
       advance(currentKeyFrame, g_currentKeyFrameIndex);
 
@@ -611,7 +594,30 @@ static void onUClick() {
   }
 }
 
+static void onNextClick() {
+  if (isCurrentFrameDefined() && g_currentKeyFrameIndex < g_keyFrames.size() - 1) {
+    g_currentKeyFrameIndex++;
+    copyCurrentKeyFrameToSceneGraph();
+  }
+  else if (isCurrentFrameDefined()){
+    copyCurrentKeyFrameToSceneGraph();
 
+  } else {
+    cout << "Current keyframe is not defined." << '\n';
+  }
+}
+
+static void onRetreatClick() {
+  if (g_currentKeyFrameIndex > 0) {
+    g_currentKeyFrameIndex--;
+    copyCurrentKeyFrameToSceneGraph();
+  }
+  else if (isCurrentFrameDefined()){
+    copyCurrentKeyFrameToSceneGraph();
+  } else {
+    cout << "Current keyframe is not defined." << '\n';
+  }
+}
 
 // _____________________________________________________
 //|                                                     |
@@ -833,6 +839,12 @@ static void keyboard(const unsigned char key, const int x, const int y) {
     break;
   case 'n':
     onNClick();
+    break;
+  case '>':
+    onNextClick();
+    break;
+  case '<':
+    onRetreatClick();
     break;
   }
   glutPostRedisplay();
