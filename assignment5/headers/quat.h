@@ -18,7 +18,6 @@ Matrix4 quatToMatrix(const Quat& q);
 
 class Quat {
   Cvec4 q_;  // layout is: q_[0]==w, q_[1]==x, q_[2]==y, q_[3]==z
-
 public:
   double operator [] (const int i) const {
     return q_[i];
@@ -152,6 +151,36 @@ inline Matrix4 quatToMatrix(const Quat& q) {
 
   assert(isAffine(r));
   return r;
+}
+
+inline double getSine(Quat q_, Cvec3 k) {
+  // make sure that we don't divide by 0
+  if (k[0] != 0)   return q_[1] / k[0];
+  if (k[1] != 0)   return q_[2] / k[1];
+  return q_[3] / k[2];
+}
+
+inline Quat cn(const Quat& q) {
+  if (q[0] < 0) {
+    return Quat(q[0] * -1, q[1] * -1, q[2] * -1, q[3] * -1);
+  }
+  return q;
+}
+
+inline Quat pow(const Quat q_, const double alpha) {
+  // normalize the last three entries to get the unit axis k
+  //  retrieve theta from the first value using atan2
+  Cvec3 k = Cvec3(q_[1], q_[2], q_[3]).normalize();
+
+  // sin(x/2) is the norm of the last three elements
+  double a = getSine(q_, k);
+
+  // cos(x/2) is the first element
+  double b = q_[0];
+
+  double theta = atan2(a, b);
+
+  return Quat(cos(theta * alpha * 0.5), k * sin(theta * alpha * 0.5));
 }
 
 #endif

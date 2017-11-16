@@ -185,8 +185,8 @@ static Cvec3f g_arcballColor(0.5, 0.5, 0.5);
 static Cvec3f g_objectColors[2] = {Cvec3f(1, 0, 0), Cvec3f(0, 1, 0)};
 
 /* Keyframe Animation variables */
-static int g_currentKeyFrameIndex = -1;
 static list<vector<RigTForm> > g_keyFrames;
+static list<vector<RigTForm> >::iterator g_currentKeyFrame = g_keyFrames.end();
 
 static vector<shared_ptr<SgRbtNode> > g_rbtNodes;
 
@@ -503,32 +503,38 @@ static void toggleActiveView() {
   }
 }
 
+// _____________________________________________________
+//|                                                     |
+//|  Key framing                                        |
+//|_____________________________________________________|
+///
+
 static bool isCurrentFrameDefined() {
-  return g_currentKeyFrameIndex > -1;
+  return g_currentKeyFrame != g_keyFrames.end();
 }
 
 static vector<RigTForm> getCurrentKeyFrame() {
-  //Get the RigTform vector from current key frame
-  // initialize iterator at element 0
-  list<vector<RigTForm> >::iterator currentKeyFrame = g_keyFrames.begin();
-  // move iterator to frame at index g_currentKeyFrameIndex
-  advance(currentKeyFrame, g_currentKeyFrameIndex);
+  // return the RigTForm pointed to by the iterator
+  return *g_currentKeyFrame;
+}
 
-  return *currentKeyFrame;
+static list<vector<RigTForm> >::iterator getLastKeyFrameIterator() {
+  list<vector<RigTForm> >::iterator iterator = g_keyFrames.end();
+
+  return --iterator;
 }
 
 static void copyCurrentKeyFrameToSceneGraph() {
   int index = 0;
   // -1 = currentKeyFrame is undefined
   if (isCurrentFrameDefined()) {
-
       // Loop over all pointers to SgRbtNodes
       for ( vector<shared_ptr<SgRbtNode> >::iterator i = g_rbtNodes.begin(); i != g_rbtNodes.end(); i++ ) {
 
         // initialize iterator at element 0
         vector<RigTForm>::iterator rigTForm = getCurrentKeyFrame().begin();
 
-        // move iterator to frame at index g_currentKeyFrameIndex
+        // move iterator to frame at index x
         advance(rigTForm, index);
 
         dynamic_pointer_cast<SgRbtNode>(*i)->setRbt(*rigTForm);
@@ -541,16 +547,21 @@ static void copyCurrentKeyFrameToSceneGraph() {
   }
 }
 
-static void copySceneGraphToKeyFrame(vector<RigTForm> &newKeyFrame) {
+static Cvec3 lerp(Cvec3 c0, Cvec3 c1, double alpha) {
+  return (c0 * (1 - alpha)) + c1 * alpha;
+}
 
+static Quat slerp(Quat q0, Quat q1, double alpha) {
+  return pow(cn(q1 * inv(q0)), alpha) * q0;
+}
+
+static void copySceneGraphToKeyFrame(vector<RigTForm> &newKeyFrame) {
   newKeyFrame.clear();
   // Loop over all pointers to SgRbtNodes
   for ( vector<shared_ptr<SgRbtNode> >::iterator rbtNodesIterator = g_rbtNodes.begin(); rbtNodesIterator != g_rbtNodes.end(); rbtNodesIterator++ ) {
     newKeyFrame.push_back((*rbtNodesIterator)->getRbt());
 
   }
-
-
   cout << "Copied scence graph to keyframe." << '\n';
 }
 
@@ -561,32 +572,23 @@ static void onSpaceClick() {
 static void onNClick() {
   // Create a new keyframe
   vector<RigTForm> newKeyFrame;
+
   // Fill the new keyframe with the current scenegraph
   copySceneGraphToKeyFrame(newKeyFrame);
+
   // Push the new keyframe into the list of keyFrames (g_keyFrames)
   g_keyFrames.push_back(newKeyFrame);
 
-  // -1 = currentKeyFrame is undefined
-  if (!isCurrentFrameDefined()) {
-    g_currentKeyFrameIndex = 0;
-  }
-  else {
-    g_currentKeyFrameIndex++;
-  }
+
+
+  // point the currentKeyFrame to the last keyFrame
+  g_currentKeyFrame = getLastKeyFrameIterator();
 }
 
 static void onUClick() {
   // -1 = currentKeyFrame is undefined
   if (isCurrentFrameDefined()) {
-
-      //Get the RigTForm vector from current key frame
-      // initialize iterator at element 0
-      list<vector<RigTForm> >::iterator currentKeyFrame = g_keyFrames.begin();
-
-      // move iterator to frame at index g_currentKeyFrameIndex
-      advance(currentKeyFrame, g_currentKeyFrameIndex);
-
-      copySceneGraphToKeyFrame(*currentKeyFrame);
+      copySceneGraphToKeyFrame(*g_currentKeyFrame);
   }
   else {
     cout << "Current keyframe is not defined." << '\n';
@@ -595,27 +597,49 @@ static void onUClick() {
 }
 
 static void onNextClick() {
-  if (isCurrentFrameDefined() && g_currentKeyFrameIndex < g_keyFrames.size() - 1) {
-    g_currentKeyFrameIndex++;
+  if (isCurrentFrameDefined() && g_currentKeyFrame != getLastKeyFrameIterator()) {
+    g_currentKeyFrame++;
     copyCurrentKeyFrameToSceneGraph();
   }
   else if (isCurrentFrameDefined()){
     copyCurrentKeyFrameToSceneGraph();
-
   } else {
     cout << "Current keyframe is not defined." << '\n';
   }
 }
 
 static void onRetreatClick() {
-  if (g_currentKeyFrameIndex > 0) {
-    g_currentKeyFrameIndex--;
+  if (g_currentKeyFrame != g_keyFrames.begin()) {
+    g_currentKeyFrame--;
     copyCurrentKeyFrameToSceneGraph();
   }
   else if (isCurrentFrameDefined()){
     copyCurrentKeyFrameToSceneGraph();
   } else {
     cout << "Current keyframe is not defined." << '\n';
+  }
+}
+
+static void onDClick() {
+  if (isCurrentFrameDefined()) {
+      list<vector<RigTForm> >::iterator oldKeyFrame = g_currentKeyFrame;
+
+      if(g_keyFrames.empty()) {
+        g_currentKeyFrame = g_keyFrames.end();
+      }
+      else {
+        if (oldKeyFrame != g_keyFrames.begin()) {
+          g_currentKeyFrame = --oldKeyFrame;
+          oldKeyFrame++;
+        }
+        else {
+          g_currentKeyFrame = ++oldKeyFrame;
+          oldKeyFrame--;
+        }
+        copyCurrentKeyFrameToSceneGraph();
+       }
+       // Remove the currentKeyFrame from the list
+       g_keyFrames.erase(oldKeyFrame);
   }
 }
 
@@ -846,6 +870,9 @@ static void keyboard(const unsigned char key, const int x, const int y) {
   case '<':
     onRetreatClick();
     break;
+  case 'd':
+    onDClick();
+    break;
   }
   glutPostRedisplay();
 }
@@ -979,7 +1006,7 @@ static void constructRobot(shared_ptr<SgTransformNode> base, const Cvec3& color)
 static void initScene() {
   g_world.reset(new SgRootNode());
 
-  g_skyNode.reset(new SgRbtNode(RigTForm(Cvec3(0.0, 0.25, 4.0))));
+  g_skyNode.reset(new SgRbtNode(RigTForm(Cvec3(0.0, 0.25, 14.0))));
 
   g_groundNode.reset(new SgRbtNode());
   g_groundNode->addChild(shared_ptr<MyShapeNode>(
