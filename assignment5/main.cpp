@@ -184,17 +184,24 @@ static Cvec3f g_arcballColor(0.5, 0.5, 0.5);
 
 static Cvec3f g_objectColors[2] = {Cvec3f(1, 0, 0), Cvec3f(0, 1, 0)};
 
-/* Keyframe Animation variables */
+// Keyframe variables
 static list<vector<RigTForm> > g_keyFrames;
 static list<vector<RigTForm> >::iterator g_currentKeyFrame = g_keyFrames.end();
 
 static vector<shared_ptr<SgRbtNode> > g_rbtNodes;
+
+// Animations variables
+static int g_msBetweenKeyFrames = 2000; // 2 seconds between keyFrames
+static int g_animateFramesPerSecond = 60;
 
 // _____________________________________________________
 //|                                                     |
 //|  END OF GLOBALS                                     |
 //|_____________________________________________________|
 ///
+
+static void animateTimerCallback(int ms);
+
 
 static void initGround() {
   // A x-z plane at y = g_groundY of dimension [-g_groundSize, g_groundSize]^2
@@ -524,7 +531,7 @@ static list<vector<RigTForm> >::iterator getLastKeyFrameIterator() {
   return --iterator;
 }
 
-static void copyCurrentKeyFrameToSceneGraph() {
+static void copyKeyFrameToSceneGraph(vector<RigTForm> keyFrame) {
   int index = 0;
   // -1 = currentKeyFrame is undefined
   if (isCurrentFrameDefined()) {
@@ -532,7 +539,7 @@ static void copyCurrentKeyFrameToSceneGraph() {
       for ( vector<shared_ptr<SgRbtNode> >::iterator i = g_rbtNodes.begin(); i != g_rbtNodes.end(); i++ ) {
 
         // initialize iterator at element 0
-        vector<RigTForm>::iterator rigTForm = getCurrentKeyFrame().begin();
+        vector<RigTForm>::iterator rigTForm = keyFrame.begin();
 
         // move iterator to frame at index x
         advance(rigTForm, index);
@@ -547,13 +554,6 @@ static void copyCurrentKeyFrameToSceneGraph() {
   }
 }
 
-static Cvec3 lerp(Cvec3 c0, Cvec3 c1, double alpha) {
-  return (c0 * (1 - alpha)) + c1 * alpha;
-}
-
-static Quat slerp(Quat q0, Quat q1, double alpha) {
-  return pow(cn(q1 * inv(q0)), alpha) * q0;
-}
 
 static void copySceneGraphToKeyFrame(vector<RigTForm> &newKeyFrame) {
   newKeyFrame.clear();
@@ -566,7 +566,9 @@ static void copySceneGraphToKeyFrame(vector<RigTForm> &newKeyFrame) {
 }
 
 static void onSpaceClick() {
-  copyCurrentKeyFrameToSceneGraph();
+  if(isCurrentFrameDefined()) {
+    copyKeyFrameToSceneGraph(*g_currentKeyFrame);
+  }
 }
 
 static void onNClick() {
@@ -578,8 +580,6 @@ static void onNClick() {
 
   // Push the new keyframe into the list of keyFrames (g_keyFrames)
   g_keyFrames.push_back(newKeyFrame);
-
-
 
   // point the currentKeyFrame to the last keyFrame
   g_currentKeyFrame = getLastKeyFrameIterator();
@@ -599,10 +599,10 @@ static void onUClick() {
 static void onNextClick() {
   if (isCurrentFrameDefined() && g_currentKeyFrame != getLastKeyFrameIterator()) {
     g_currentKeyFrame++;
-    copyCurrentKeyFrameToSceneGraph();
+    copyKeyFrameToSceneGraph(*g_currentKeyFrame);
   }
   else if (isCurrentFrameDefined()){
-    copyCurrentKeyFrameToSceneGraph();
+    copyKeyFrameToSceneGraph(*g_currentKeyFrame);
   } else {
     cout << "Current keyframe is not defined." << '\n';
   }
@@ -611,10 +611,10 @@ static void onNextClick() {
 static void onRetreatClick() {
   if (g_currentKeyFrame != g_keyFrames.begin()) {
     g_currentKeyFrame--;
-    copyCurrentKeyFrameToSceneGraph();
+    copyKeyFrameToSceneGraph(*g_currentKeyFrame);
   }
   else if (isCurrentFrameDefined()){
-    copyCurrentKeyFrameToSceneGraph();
+    copyKeyFrameToSceneGraph(*g_currentKeyFrame);
   } else {
     cout << "Current keyframe is not defined." << '\n';
   }
@@ -636,11 +636,79 @@ static void onDClick() {
           g_currentKeyFrame = ++oldKeyFrame;
           oldKeyFrame--;
         }
-        copyCurrentKeyFrameToSceneGraph();
+        copyKeyFrameToSceneGraph(*g_currentKeyFrame);
        }
        // Remove the currentKeyFrame from the list
        g_keyFrames.erase(oldKeyFrame);
   }
+}
+
+static void onYClick(){
+  animateTimerCallback(0);
+}
+
+// _____________________________________________________
+//|                                                     |
+//|  Animations                                         |
+//|_____________________________________________________|
+///
+static Cvec3 lerp(Cvec3 c0, Cvec3 c1, double alpha) {
+  return (c0 * (1 - alpha)) + c1 * alpha;
+}
+
+static Quat slerp(Quat q0, Quat q1, double alpha) {
+  if (q0[0] == q1[0] && q0[1] == q1[1] && q0[2] == q1[2] && q0[3] == q1[3])
+    return q0;
+
+  return pow(cn(q1 * inv(q0)), alpha) * q0;
+}
+
+
+static RigTForm slerpLerp(RigTForm rbt0, RigTForm rbt1, double alpha){
+
+  //We take 2 rbts and do a linear interpolation between based on alpha[0...1] and put it in a new rbt
+  //We then return the new rbt
+  RigTForm newRbt;
+  newRbt.setTranslation( lerp (rbt0.getTranslation(), rbt1.getTranslation(), alpha ));
+  newRbt.setRotation( slerp (rbt0.getRotation(), rbt1.getRotation(), alpha ));
+
+  return newRbt;
+}
+
+// Given t in the range [0..n], perform interpolation and draw the scene for the particulat t
+// Returns true if we are at the end of the animation sequence or false otherwise
+
+bool interpolateAndDisplay(double t) {
+  double alpha = t - floor(t);
+  int frame0Index = floor(t);
+  int frame1Index = floor(t) + 1;
+
+  // initialize iterator at element 0
+  list<vector<RigTForm> >::iterator iterator = g_keyFrames.begin();
+
+  // move iterator to frame0
+  advance(iterator, frame0Index);
+
+  vector<RigTForm> frame0 = *iterator;
+
+  // move iterator to frame1
+  iterator ++;
+
+  vector<RigTForm> frame1 = *iterator;
+
+  vector<RigTForm> interpolatedFrame;
+
+  // Loop through frame0 and frame1 at the same time. At each index,
+  // calculate the newRbt by slerp and lerp and push it to interpolatedFrame.
+  for (size_t i = 0; i < frame0.size(); i++) {
+
+    interpolatedFrame.push_back(slerpLerp(frame0[i], frame1[i], alpha))  ;
+
+  }
+  //invoke the function to redraw the frame based on the new interpolated vector of rbts
+  copyKeyFrameToSceneGraph(interpolatedFrame);
+   glutPostRedisplay();
+  return frame1Index == g_keyFrames.size() - 1 ;
 }
 
 // _____________________________________________________
@@ -873,8 +941,32 @@ static void keyboard(const unsigned char key, const int x, const int y) {
   case 'd':
     onDClick();
     break;
+  case 'y':
+    onYClick();
+    break;
   }
   glutPostRedisplay();
+}
+
+// _____________________________________________________
+//|                                                     |
+//|  animateTimerCallback                               |
+//|_____________________________________________________|
+///
+/// glutTimerFunc registers the timer callback func to be triggered in at least
+/// msecs milliseconds. The value parameter to the timer callback will be the value
+/// of the value parameter to glutTimerFunc.
+
+static void animateTimerCallback(int ms) {
+
+  double t = (double) ms / (double) g_msBetweenKeyFrames;
+  bool endReached = interpolateAndDisplay(t);
+  if(!endReached){
+      glutTimerFunc(1000 / g_animateFramesPerSecond, animateTimerCallback, ms + 1000/g_animateFramesPerSecond);
+  }else{
+
+  }
+
 }
 
 // _____________________________________________________
