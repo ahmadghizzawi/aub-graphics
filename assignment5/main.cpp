@@ -707,7 +707,7 @@ bool interpolateAndDisplay(double t) {
   }
   //invoke the function to redraw the frame based on the new interpolated vector of rbts
   copyKeyFrameToSceneGraph(interpolatedFrame);
-   glutPostRedisplay();
+  glutPostRedisplay();
   return frame1Index == g_keyFrames.size() - 1 ;
 }
 
