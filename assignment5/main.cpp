@@ -633,7 +633,7 @@ static void onDClick()
 
     //If the list of keyframes is empty, do nothing
     if(!g_keyFrames.empty()){
-       
+
        //when g_currentKeyFrame == g_keyFrames.begin(), it means the deleted frame was the first element
        //If not set the current key Frame to the one immediately after the deleted frame
        if(g_currentKeyFrame != g_keyFrames.begin() ){
@@ -653,7 +653,6 @@ static void onDClick()
 // else
 //  pauses the animation.
 static void onYClick(){
-<<<<<<< HEAD
 
   if(g_keyFrames.size() >= 4){
        animateTimerCallback(0);
@@ -661,7 +660,6 @@ static void onYClick(){
    else {
     cout << "You need at least 4 keyframes to play an animation" << '\n';
    }
-=======
   if (!g_animationRunning && g_keyFrames.size() >= 4) {
     g_animationRunning = true;
     g_animateFramesPerSecond = 60;
@@ -684,7 +682,6 @@ static void onPlusClick(){
 // each pairs of keyframes
 static void onMinusClick(){
   g_animateFramesPerSecond++;
->>>>>>> eaa0252ac1d9e7513a5402ff39ca3b55574e9167
 }
 
 // _____________________________________________________
@@ -994,16 +991,12 @@ static void keyboard(const unsigned char key, const int x, const int y) {
   case 'y':
     onYClick();
     break;
-<<<<<<< HEAD
-  
-=======
   case '+':
     onPlusClick();
     break;
   case '-':
     onMinusClick();
     break;
->>>>>>> eaa0252ac1d9e7513a5402ff39ca3b55574e9167
   }
   glutPostRedisplay();
 }
