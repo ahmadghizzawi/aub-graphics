@@ -128,9 +128,7 @@ public:
 
   // Normalize self and returns self
   Cvec& normalize() {
-    std::cout << "before assertion"<< '\n';
     assert(dot(*this, *this) > CS175_EPS2);
-    std::cout << "after assertion"<< '\n';
     return *this /= std::sqrt(dot(*this, *this));
   }
 };
