@@ -647,7 +647,13 @@ static void onDClick()
 }
 
 static void onYClick(){
-  animateTimerCallback(0);
+
+  if(g_keyFrames.size() >= 4){
+       animateTimerCallback(0);
+  }
+   else {
+    cout << "You need at least 4 keyframes to play an animation" << '\n';
+   }
 }
 
 // _____________________________________________________
@@ -949,6 +955,7 @@ static void keyboard(const unsigned char key, const int x, const int y) {
   case 'y':
     onYClick();
     break;
+  
   }
   glutPostRedisplay();
 }
