@@ -637,7 +637,7 @@ static void onDClick()
 
     //If the list of keyframes is empty, do nothing
     if(!g_keyFrames.empty()){
-       
+
        //when g_currentKeyFrame == g_keyFrames.begin(), it means the deleted frame was the first element
        //If not set the current key Frame to the one immediately after the deleted frame
        if(g_currentKeyFrame != g_keyFrames.begin() ){
@@ -658,7 +658,7 @@ static void onDClick()
 //  pauses the animation.
 static void onYClick(){
   if(g_keyFrames.size() > 4)
-  {  
+  {
     if (!g_animationRunning   ) {
       cout << "Started playing the animation. " << '\n';
       g_animationRunning = true;
@@ -677,22 +677,25 @@ static void onYClick(){
 // Handler function for +
 // Makes the animation go faster by removing one interpolated frame between
 // each pairs of keyframes
-static void onPlusClick(){
-  g_msBetweenKeyFrames = g_msBetweenKeyFrames - 100;
+static void onPlusClick() {
+  if (g_msBetweenKeyFrames - 100 > 0) {
+    g_msBetweenKeyFrames = g_msBetweenKeyFrames - 100;
+    std::cout << g_msBetweenKeyFrames << '\n';
+  }
 }
 
 // Handler function for -
 // Should make the animation go slower by adding more one interpolated frame between
 // each pairs of keyframes
-static void onMinusClick(){
+static void onMinusClick() {
   g_msBetweenKeyFrames = g_msBetweenKeyFrames + 100;
 }
 
-static void onWClick(){
+static void onWClick() {
 
     ofstream exportFile;
     exportFile.open(keyFramesFileName.c_str());
-    
+
     string toInsert = "";
     for (list<vector<RigTForm> >::iterator vectorIter = g_keyFrames.begin(); vectorIter != g_keyFrames.end(); vectorIter++) {
 
@@ -701,7 +704,7 @@ static void onWClick(){
          s << (*vectorIter)[i].serialize();
         if (i != (*vectorIter).size() - 1) s << SERIALIZATION_DELIMITER;
       }
-      toInsert += s.str() + "\n"; 
+      toInsert += s.str() + "\n";
 
     }
 
@@ -710,23 +713,23 @@ static void onWClick(){
 
      cout << "Exported saved key frames to " << keyFramesFileName << '\n';
   }
- 
+
 static void onIClick(){
 
     //Open key frames file
     ifstream importFile;
-    importFile.open(keyFramesFileName.c_str());  
+    importFile.open(keyFramesFileName.c_str());
 
     if (importFile == NULL) {
       cout << "File not available" << '\n';
-      
+
     }
 
     vector<string> lines = vector<string>();
 
-    //Get all lines  
+    //Get all lines
     string line;
-    while (getline(importFile, line)) 
+    while (getline(importFile, line))
     {
       lines.push_back(line);
     }
@@ -737,7 +740,7 @@ static void onIClick(){
     list<vector<RigTForm> > importedFrames;
 
     for (int i = 0; i < lines.size(); i++) {
-      
+
       vector<string> lineRBTs = split(lines[i], SERIALIZATION_DELIMITER);
       assert(lineRBTs.size() > 0);
       vector<RigTForm> allRbts = vector<RigTForm>();
@@ -746,8 +749,8 @@ static void onIClick(){
          allRbts.push_back(RigTForm::deserialize(lineRBTs[i]));
       }
       importedFrames.push_back(allRbts);
-          
-    }  
+
+    }
 
     //Move new list to the g_keyFrames list
     g_keyFrames =   importedFrames;
@@ -1078,7 +1081,7 @@ static void keyboard(const unsigned char key, const int x, const int y) {
     break;
   case 'w':
     onWClick();
-    break;  
+    break;
   }
   glutPostRedisplay();
 }
@@ -1100,7 +1103,7 @@ static void animateTimerCallback(int ms) {
     glutTimerFunc(1000 / g_animateFramesPerSecond, animateTimerCallback, ms + 1000/g_animateFramesPerSecond);
   }
   else {
-
+    g_animationRunning = false;
   }
 
 }
