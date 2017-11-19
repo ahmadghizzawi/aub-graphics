@@ -402,8 +402,6 @@ static void drawStuff(const ShaderState& curSS, bool picking) {
   safe_glUniform3f(curSS.h_uLight, eyeLight1[0], eyeLight1[1], eyeLight1[2]);
   safe_glUniform3f(curSS.h_uLight2, eyeLight2[0], eyeLight2[1], eyeLight2[2]);
 
-
-
   // draw robots, and ground
   // ==========
   //
