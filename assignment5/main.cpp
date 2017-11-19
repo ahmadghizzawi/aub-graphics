@@ -680,7 +680,7 @@ static void onYClick(){
 static void onPlusClick() {
   if (g_msBetweenKeyFrames - 100 > 0) {
     g_msBetweenKeyFrames = g_msBetweenKeyFrames - 100;
-    std::cout << g_msBetweenKeyFrames << '\n';
+    cout << "Decreased time between frames to: " << g_msBetweenKeyFrames << "ms" << '\n';
   }
 }
 
@@ -689,6 +689,7 @@ static void onPlusClick() {
 // each pairs of keyframes
 static void onMinusClick() {
   g_msBetweenKeyFrames = g_msBetweenKeyFrames + 100;
+  cout << "Increased time between frames to: " << g_msBetweenKeyFrames << "ms" << '\n';
 }
 
 static void onWClick() {
