@@ -1,5 +1,6 @@
 #ifndef QUAT_H
 #define QUAT_H
+ 
 
 #include <iostream>
 #include <cassert>
@@ -108,6 +109,15 @@ public:
     r.q_[0] = std::cos(h);
     return r;
   }
+
+   std::string serialize() {
+    return q_.serialize();
+  }
+
+  static Quat deserialize(std::string ss) {
+    const Cvec4 qq_ = deserializeCvec4(ss);
+    return Quat(qq_[0], qq_[1], qq_[2], qq_[3]);
+  }
 };
 
 inline double dot(const Quat& q, const Quat& p) {
@@ -181,5 +191,7 @@ inline Quat pow(const Quat q_, const double alpha) {
 
   return Quat(cos(theta * alpha * 0.5), k * sin(theta * alpha * 0.5));
 }
+
+ 
 
 #endif

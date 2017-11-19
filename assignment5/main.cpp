@@ -34,7 +34,8 @@
 #include "headers/sgutils.h"
 using namespace std; // for string, vector, iostream, smart pointers, and other
                      // standard C++ stuff
-
+#include <fstream>
+#include <sstream>
 // _____________________________________________________
 //|                                                     |
 //|  GLOBALS                                            |
@@ -194,6 +195,11 @@ static vector<shared_ptr<SgRbtNode> > g_rbtNodes;
 static int g_msBetweenKeyFrames = 2000; // 2 seconds between keyFrames
 static int g_animateFramesPerSecond = 60;
 static bool g_animationRunning = false;
+
+//Import Export Key Frame Variable
+
+static const string keyFramesFileName = "key.frames";
+static const char SERIALIZATION_DELIMITER = ' ';
 
 // _____________________________________________________
 //|                                                     |
@@ -631,7 +637,7 @@ static void onDClick()
 
     //If the list of keyframes is empty, do nothing
     if(!g_keyFrames.empty()){
-
+       
        //when g_currentKeyFrame == g_keyFrames.begin(), it means the deleted frame was the first element
        //If not set the current key Frame to the one immediately after the deleted frame
        if(g_currentKeyFrame != g_keyFrames.begin() ){
@@ -651,20 +657,20 @@ static void onDClick()
 // else
 //  pauses the animation.
 static void onYClick(){
-
-  if(g_keyFrames.size() >= 4){
-       animateTimerCallback(0);
-  }
-   else {
-    cout << "You need at least 4 keyframes to play an animation" << '\n';
-   }
-  if (!g_animationRunning && g_keyFrames.size() >= 4) {
-    g_animationRunning = true;
-    g_animateFramesPerSecond = 60;
-    animateTimerCallback(0);
-  }
-  else {
-    g_animationRunning = false;
+  if(g_keyFrames.size() > 4)
+  {  
+    if (!g_animationRunning   ) {
+      cout << "Started playing the animation. " << '\n';
+      g_animationRunning = true;
+      g_animateFramesPerSecond = 60;
+      animateTimerCallback(0);
+    }
+    else {
+      g_animationRunning = false;
+      cout << "Stopped playing the animation. " << '\n';
+    }
+  }else{
+    cout << "Shold have at least 4 frames to play the animation. " << '\n';
   }
 }
 
@@ -672,14 +678,86 @@ static void onYClick(){
 // Makes the animation go faster by removing one interpolated frame between
 // each pairs of keyframes
 static void onPlusClick(){
-  g_animateFramesPerSecond--;
+  g_msBetweenKeyFrames = g_msBetweenKeyFrames - 100;
 }
 
 // Handler function for -
 // Should make the animation go slower by adding more one interpolated frame between
 // each pairs of keyframes
 static void onMinusClick(){
-  g_animateFramesPerSecond++;
+  g_msBetweenKeyFrames = g_msBetweenKeyFrames + 100;
+}
+
+static void onWClick(){
+
+    ofstream exportFile;
+    exportFile.open(keyFramesFileName.c_str());
+    
+    string toInsert = "";
+    for (list<vector<RigTForm> >::iterator vectorIter = g_keyFrames.begin(); vectorIter != g_keyFrames.end(); vectorIter++) {
+
+      stringstream s;
+      for (int i = 0; i < (*vectorIter).size(); i++) {
+         s << (*vectorIter)[i].serialize();
+        if (i != (*vectorIter).size() - 1) s << SERIALIZATION_DELIMITER;
+      }
+      toInsert += s.str() + "\n"; 
+
+    }
+
+    exportFile << toInsert;
+    exportFile.close();
+
+     cout << "Exported saved key frames to " << keyFramesFileName << '\n';
+  }
+ 
+static void onIClick(){
+
+    //Open key frames file
+    ifstream importFile;
+    importFile.open(keyFramesFileName.c_str());  
+
+    if (importFile == NULL) {
+      cout << "File not available" << '\n';
+      
+    }
+
+    vector<string> lines = vector<string>();
+
+    //Get all lines  
+    string line;
+    while (getline(importFile, line)) 
+    {
+      lines.push_back(line);
+    }
+
+    importFile.close();
+
+    //We need to get each line and transform it into a vector of RigTForm
+    list<vector<RigTForm> > importedFrames;
+
+    for (int i = 0; i < lines.size(); i++) {
+      
+      vector<string> lineRBTs = split(lines[i], SERIALIZATION_DELIMITER);
+      assert(lineRBTs.size() > 0);
+      vector<RigTForm> allRbts = vector<RigTForm>();
+      //after getting the vector we need to deserialize to RBT
+      for (int i = 0; i < lineRBTs.size(); i++) {
+         allRbts.push_back(RigTForm::deserialize(lineRBTs[i]));
+      }
+      importedFrames.push_back(allRbts);
+          
+    }  
+
+    //Move new list to the g_keyFrames list
+    g_keyFrames =   importedFrames;
+    //Set the current key frame to the first frame in imported list
+    g_currentKeyFrame = g_keyFrames.begin();
+    //Apply the new frames
+    copyKeyFrameToSceneGraph(*g_currentKeyFrame);
+
+     cout << "Imported key frames from " << keyFramesFileName <<'\n';
+
 }
 
 // _____________________________________________________
@@ -888,7 +966,7 @@ static void motion(const int x, const int y) {
 static void mouse(const int button, const int state, const int x, const int y) {
   g_mouseClickX = x;
   g_mouseClickY = g_windowHeight - y - 1; // conversion from GLUT
-                                          // window-coordinate-system to OpenGL
+                                          // window-coordinate-system to  static const char SERIALIZATION_DELIMITER = ' ';OpenGL
                                           // window-coordinate-system
 
   g_mouseLClickButton |= (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN);
@@ -995,6 +1073,12 @@ static void keyboard(const unsigned char key, const int x, const int y) {
   case '-':
     onMinusClick();
     break;
+  case 'i':
+    onIClick();
+    break;
+  case 'w':
+    onWClick();
+    break;  
   }
   glutPostRedisplay();
 }
