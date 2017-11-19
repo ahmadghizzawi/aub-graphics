@@ -4,12 +4,18 @@
 #include <cassert>
 #include <iostream>
 
+#include <fstream>
+#include <sstream>
+
 #include "matrix4.h"
 #include "quat.h"
+
+ 
 
 class RigTForm {
   Cvec3 t_; // translation component
   Quat r_;  // rotation component represented as a quaternion
+  static const char SERIALIZATION_DELIMITER = ';';
 
 public:
   RigTForm() : t_(0) { assert(norm2(Quat(1, 0, 0, 0) - r_) < CS175_EPS2); }
@@ -59,6 +65,17 @@ public:
 
     return RigTForm(transformation, rotation);
   }
+
+  std::string serialize() {
+    stringstream s;
+    s << t_.serialize() << SERIALIZATION_DELIMITER << r_.serialize();
+    return s.str();
+  }
+
+  static RigTForm deserialize(std::string ss) {
+    vector<std::string> section = split(ss, ';');
+    return RigTForm(deserializeCvec3(section[0]), Quat::deserialize(section[1]));
+  }
 };
 
 // The inverse of a RigTForm
@@ -91,5 +108,7 @@ inline Matrix4 rigTFormToMatrix(const RigTForm &tform) {
   Matrix4 R = quatToMatrix(tform.getRotation());
   return T * R;
 }
+
+ 
 
 #endif

@@ -6,10 +6,19 @@ VECTOR CLASS. Houses vectors operations.
 
 #ifndef VEC_H
 #define VEC_H
+
+#include <string>
+#include <vector>
+using namespace std;
+
 #include <iostream>
 #include <cmath>
 #include <cassert>
 #include <algorithm>
+
+#include <cassert>
+#include <sstream>
+
 
 
 static const double CS175_PI = 3.14159265358979323846264338327950288;
@@ -131,6 +140,16 @@ public:
     assert(dot(*this, *this) > CS175_EPS2);
     return *this /= std::sqrt(dot(*this, *this));
   }
+
+   string serialize() {
+    stringstream s;
+    for (int i = 0; i < n; i++) {
+      s << d_[i];
+      if (i != n - 1) s << ",";
+    }
+    return s.str();
+  }
+
 };
 
 template<typename T>
@@ -165,6 +184,9 @@ inline Cvec<T, n> normalize(const Cvec<T,n>& v) {
   return v / norm(v);
 }
 
+
+
+
 // element of type double precision float
 typedef Cvec <double, 2> Cvec2;
 typedef Cvec <double, 3> Cvec3;
@@ -179,5 +201,33 @@ typedef Cvec <float, 4> Cvec4f;
 typedef Cvec <unsigned char, 2> Cvec2ub;
 typedef Cvec <unsigned char, 3> Cvec3ub;
 typedef Cvec <unsigned char, 4> Cvec4ub;
+
+
+static vector<string> &split(const string &s, char delim, vector<string> &elems) {
+  stringstream ss(s);
+  string item;
+  while (getline(ss, item, delim)) elems.push_back(item);
+  return elems;
+}
+
+static vector<string> split(const string &s, char delim) {
+  vector<string> elems;
+  split(s, delim, elems);
+  return elems;
+}
+
+static Cvec3 deserializeCvec3(string ss) {
+  vector<string> out = split(ss, ',');
+  assert(out.size() == 3);
+  return Cvec3(atof(out[0].c_str()), atof(out[1].c_str()), atof(out[2].c_str()));
+}
+
+
+static Cvec4 deserializeCvec4(string ss) {
+  vector<string> out = split(ss, ',');
+  assert(out.size() == 4);
+  return Cvec4(atof(out[0].c_str()), atof(out[1].c_str()), atof(out[2].c_str()), atof(out[3].c_str()));
+}
+
 
 #endif
