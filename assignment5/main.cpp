@@ -193,6 +193,7 @@ static vector<shared_ptr<SgRbtNode> > g_rbtNodes;
 // Animations variables
 static int g_msBetweenKeyFrames = 2000; // 2 seconds between keyFrames
 static int g_animateFramesPerSecond = 60;
+static bool g_animationRunning = false;
 
 // _____________________________________________________
 //|                                                     |
@@ -646,7 +647,13 @@ static void onDClick()
   }
 }
 
+// Handler function for Y
+// If the animation is not running and there is at least 4 keyframes,
+//  starts the animation sequence
+// else
+//  pauses the animation.
 static void onYClick(){
+<<<<<<< HEAD
 
   if(g_keyFrames.size() >= 4){
        animateTimerCallback(0);
@@ -654,6 +661,30 @@ static void onYClick(){
    else {
     cout << "You need at least 4 keyframes to play an animation" << '\n';
    }
+=======
+  if (!g_animationRunning && g_keyFrames.size() >= 4) {
+    g_animationRunning = true;
+    g_animateFramesPerSecond = 60;
+    animateTimerCallback(0);
+  }
+  else {
+    g_animationRunning = false;
+  }
+}
+
+// Handler function for +
+// Makes the animation go faster by removing one interpolated frame between
+// each pairs of keyframes
+static void onPlusClick(){
+  g_animateFramesPerSecond--;
+}
+
+// Handler function for -
+// Should make the animation go slower by adding more one interpolated frame between
+// each pairs of keyframes
+static void onMinusClick(){
+  g_animateFramesPerSecond++;
+>>>>>>> eaa0252ac1d9e7513a5402ff39ca3b55574e9167
 }
 
 // _____________________________________________________
@@ -684,13 +715,19 @@ static RigTForm slerpLerp(RigTForm rbt0, RigTForm rbt1, double alpha){
   return newRbt;
 }
 
-// Given t in the range [0..n], perform interpolation and draw the scene for the particulat t
+// Given t in the range [0..n], perform interpolation and draw the scene for the particular t.
 // Returns true if we are at the end of the animation sequence or false otherwise
 
 bool interpolateAndDisplay(double t) {
   double alpha = t - floor(t);
   int frame0Index = floor(t);
   int frame1Index = floor(t) + 1;
+
+  // Assume that our keyframe indices start from -1 to n, but the allowed range is
+  // [0, n-1]. Therefore, frame with index 0 would be -1. So if t = 0.5,
+  // this means that the index of frame 0 would be 1 and frame 1 would be 2
+  ++frame0Index;
+  ++frame1Index;
 
   // initialize iterator at element 0
   list<vector<RigTForm> >::iterator iterator = g_keyFrames.begin();
@@ -701,7 +738,7 @@ bool interpolateAndDisplay(double t) {
   vector<RigTForm> frame0 = *iterator;
 
   // move iterator to frame1
-  iterator ++;
+  iterator++;
 
   vector<RigTForm> frame1 = *iterator;
 
@@ -714,11 +751,13 @@ bool interpolateAndDisplay(double t) {
     interpolatedFrame.push_back(slerpLerp(frame0[i], frame1[i], alpha))  ;
 
   }
-  //invoke the function to redraw the frame based on the new interpolated vector of rbts
+
+  // copy the interpolated frame to scenegraph
   copyKeyFrameToSceneGraph(interpolatedFrame);
 
   //Redraw scene
-   glutPostRedisplay();
+  glutPostRedisplay();
+
   return frame1Index == g_keyFrames.size() - 1 ;
 }
 
@@ -955,7 +994,16 @@ static void keyboard(const unsigned char key, const int x, const int y) {
   case 'y':
     onYClick();
     break;
+<<<<<<< HEAD
   
+=======
+  case '+':
+    onPlusClick();
+    break;
+  case '-':
+    onMinusClick();
+    break;
+>>>>>>> eaa0252ac1d9e7513a5402ff39ca3b55574e9167
   }
   glutPostRedisplay();
 }
@@ -973,9 +1021,10 @@ static void animateTimerCallback(int ms) {
 
   double t = (double) ms / (double) g_msBetweenKeyFrames;
   bool endReached = interpolateAndDisplay(t);
-  if(!endReached){
-      glutTimerFunc(1000 / g_animateFramesPerSecond, animateTimerCallback, ms + 1000/g_animateFramesPerSecond);
-  }else{
+  if(!endReached && g_animationRunning){
+    glutTimerFunc(1000 / g_animateFramesPerSecond, animateTimerCallback, ms + 1000/g_animateFramesPerSecond);
+  }
+  else {
 
   }
 
