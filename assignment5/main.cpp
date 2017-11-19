@@ -620,26 +620,29 @@ static void onRetreatClick() {
   }
 }
 
-static void onDClick() {
-  if (isCurrentFrameDefined()) {
-      list<vector<RigTForm> >::iterator oldKeyFrame = g_currentKeyFrame;
+static void onDClick()
+{
+  if (isCurrentFrameDefined())
+  {
+    list<vector<RigTForm> >::iterator frametoDelete = g_currentKeyFrame;
+    //Advance the iterator to the next element
+    g_currentKeyFrame++;
+    // Remove the currentKeyFrame from the list
+    g_keyFrames.erase(frametoDelete);
 
-      if(g_keyFrames.empty()) {
-        g_currentKeyFrame = g_keyFrames.end();
-      }
-      else {
-        if (oldKeyFrame != g_keyFrames.begin()) {
-          g_currentKeyFrame = --oldKeyFrame;
-          oldKeyFrame++;
-        }
-        else {
-          g_currentKeyFrame = ++oldKeyFrame;
-          oldKeyFrame--;
-        }
-        copyKeyFrameToSceneGraph(*g_currentKeyFrame);
+    //If the list of keyframes is empty, do nothing
+    if(!g_keyFrames.empty()){
+       
+       //when g_currentKeyFrame == g_keyFrames.begin(), it means the deleted frame was the first element
+       //If not set the current key Frame to the one immediately after the deleted frame
+       if(g_currentKeyFrame != g_keyFrames.begin() ){
+         g_currentKeyFrame--;
        }
-       // Remove the currentKeyFrame from the list
-       g_keyFrames.erase(oldKeyFrame);
+
+       copyKeyFrameToSceneGraph(*g_currentKeyFrame);
+
+
+    }
   }
 }
 
