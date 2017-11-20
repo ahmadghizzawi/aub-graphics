@@ -801,6 +801,8 @@ static RigTForm slerpLerp(RigTForm rbt0, RigTForm rbt1, double alpha){
 // di and ei.
 // Returns a RigTForm vector of size 2 that contains control point d at 0 and e at index 1
 static vector<RigTForm> controlPoints(RigTForm c_minus, RigTForm c, RigTForm c_plus, RigTForm c_plus2) {
+
+
   Cvec3 translation;
   Quat rotation;
 
@@ -808,11 +810,23 @@ static vector<RigTForm> controlPoints(RigTForm c_minus, RigTForm c, RigTForm c_p
   // controlPoint = pow(ci+1*c-1, 1/6) * ci
   // Control point e is negated as described in the book.
   translation = (c_plus.getTranslation() - c_minus.getTranslation()) * (1/6) + c.getTranslation();
-  rotation = pow(cn(c_plus.getRotation() * inv(c_minus.getRotation())), 1/6) * c.getRotation();
+  if(c_minus.getRotation() == c_plus.getRotation()) {
+    rotation = c.getRotation();
+  }
+  else {
+    rotation = pow(cn(c_plus.getRotation() * inv(c_minus.getRotation())), 1/6) * c.getRotation();
+  }
   RigTForm d = RigTForm(translation, rotation);
 
+
   translation = (c_plus2.getTranslation() - c.getTranslation()) * (-1/6) + c_plus.getTranslation();
-  rotation = pow(cn(c_plus2.getRotation() * inv(c.getRotation())), -1/6) * c_plus.getRotation();
+  if(c_minus.getRotation() == c_plus.getRotation()) {
+    rotation = c.getRotation();
+  }
+  else {
+    rotation = pow(cn(c_plus2.getRotation() * inv(c.getRotation())), -1/6) * c_plus.getRotation();
+  }
+
   RigTForm e = RigTForm(translation, rotation);
 
   vector<RigTForm> controlPointsVec;

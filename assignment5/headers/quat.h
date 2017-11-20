@@ -59,6 +59,13 @@ public:
     q_ /= a;
     return *this;
   }
+  // Overloaded the == operator for convenience
+  bool operator == (const Quat a) {
+    if (q_[0] == a[0] && q_[1] == a[1] && q_[2] == a[2] && q_[3] == a[3]) {
+      return true;
+    }
+    return false;
+  }
 
   Quat operator + (const Quat& a) const {
     return Quat(*this) += a;
@@ -180,8 +187,9 @@ inline Quat cn(const Quat& q) {
 inline Quat pow(const Quat q_, const double alpha) {
   // normalize the last three entries to get the unit axis k
   //  retrieve theta from the first value using atan2
-  cout << q_[1] << q_[2] << q_[3] << '\n';
+  cout << q_[0] << q_[1] << q_[2] << q_[3] << '\n';
   Cvec3 k = Cvec3(q_[1], q_[2], q_[3]).normalize();
+
   // sin(x/2) is the norm of the last three elements
   double a = getSine(q_, k);
 
