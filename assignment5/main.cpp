@@ -195,6 +195,7 @@ static vector<shared_ptr<SgRbtNode> > g_rbtNodes;
 static int g_msBetweenKeyFrames = 2000; // 2 seconds between keyFrames
 static int g_animateFramesPerSecond = 60;
 static bool g_animationRunning = false;
+static int g_animationType = 1; // 0 is standard lerp/slerp. 1 is catmull-rom.
 
 //Import Export Key Frame Variable
 
@@ -769,10 +770,15 @@ static void onIClick(){
 //|  Animations                                         |
 //|_____________________________________________________|
 ///
+
+// Linear interpolation
+// Returns an interpolated Cvec3 based on the alpha provided.
 static Cvec3 lerp(Cvec3 c0, Cvec3 c1, double alpha) {
   return (c0 * (1 - alpha)) + c1 * alpha;
 }
 
+// Spherical Linear interpolation
+// Returns an interpolated Quat based on the alpha provided.
 static Quat slerp(Quat q0, Quat q1, double alpha) {
   if (q0[0] == q1[0] && q0[1] == q1[1] && q0[2] == q1[2] && q0[3] == q1[3])
     return q0;
@@ -780,11 +786,10 @@ static Quat slerp(Quat q0, Quat q1, double alpha) {
   return pow(cn(q1 * inv(q0)), alpha) * q0;
 }
 
-
+// Takes in 2 rbts and does a linear interpolation between them  based on
+// alpha[0...1]
+// Returns the new rbt
 static RigTForm slerpLerp(RigTForm rbt0, RigTForm rbt1, double alpha){
-
-  //We take 2 rbts and do a linear interpolation between based on alpha[0...1] and put it in a new rbt
-  //We then return the new rbt
   RigTForm newRbt;
   newRbt.setTranslation( lerp (rbt0.getTranslation(), rbt1.getTranslation(), alpha ));
   newRbt.setRotation( slerp (rbt0.getRotation(), rbt1.getRotation(), alpha ));
@@ -792,15 +797,55 @@ static RigTForm slerpLerp(RigTForm rbt0, RigTForm rbt1, double alpha){
   return newRbt;
 }
 
+// Takes in ci-1, ci, ci+1, and ci+2 as arguments and calculates control points
+// di and ei.
+// Returns a RigTForm vector of size 2 that contains control point d at 0 and e at index 1
+static vector<RigTForm> controlPoints(RigTForm c_minus, RigTForm c, RigTForm c_plus, RigTForm c_plus2) {
+  Cvec3 translation;
+  Quat rotation;
+
+  // Calculating control points values based on the formula below.
+  // controlPoint = pow(ci+1*c-1, 1/6) * ci
+  // Control point e is negated as described in the book.
+  translation = (c_plus.getTranslation() - c_minus.getTranslation()) * (1/6) + c.getTranslation();
+  rotation = pow(cn(c_plus.getRotation() * inv(c_minus.getRotation())), 1/6) * c.getRotation();
+  RigTForm d = RigTForm(translation, rotation);
+
+  translation = (c_plus2.getTranslation() - c.getTranslation()) * (-1/6) + c_plus.getTranslation();
+  rotation = pow(cn(c_plus2.getRotation() * inv(c.getRotation())), -1/6) * c_plus.getRotation();
+  RigTForm e = RigTForm(translation, rotation);
+
+  vector<RigTForm> controlPointsVec;
+  controlPointsVec.push_back(d);
+  controlPointsVec.push_back(e);
+
+  return controlPointsVec;
+}
+
+// Takes in 4 rbts and does a linear interpolation using Catmull-Rom splines.
+static RigTForm catmullRomInterpolate(RigTForm c_minus, RigTForm c, RigTForm c_plus, RigTForm c_plus2, double alpha) {
+  vector<RigTForm> controlPointsVec = controlPoints(c_minus, c, c_plus, c_plus2);
+
+  const RigTForm d = controlPointsVec[0];
+  const RigTForm e = controlPointsVec[1];
+
+  const RigTForm f = slerpLerp(c, d, alpha);
+  const RigTForm g = slerpLerp(d, e, alpha);
+  const RigTForm h = slerpLerp(e, c_plus, alpha);
+  const RigTForm m = slerpLerp(f, g, alpha);
+  const RigTForm n = slerpLerp(g, h, alpha);
+
+  return slerpLerp(m, n, alpha);
+}
+
 // Given t in the range [0..n], perform interpolation and draw the scene for the particular t.
 // Returns true if we are at the end of the animation sequence or false otherwise
-
 bool interpolateAndDisplay(double t) {
   double alpha = t - floor(t);
   int frame0Index = floor(t);
   int frame1Index = floor(t) + 1;
 
-  // Assume that our keyframe indices start from -1 to n, but the allowed range is
+  // We assume that our keyframe indices start from -1 to n, but the allowed range is
   // [0, n-1]. Therefore, frame with index 0 would be -1. So if t = 0.5,
   // this means that the index of frame 0 would be 1 and frame 1 would be 2
   ++frame0Index;
@@ -825,7 +870,7 @@ bool interpolateAndDisplay(double t) {
   // calculate the newRbt by slerp and lerp and push it to interpolatedFrame.
   for (size_t i = 0; i < frame0.size(); i++) {
 
-    interpolatedFrame.push_back(slerpLerp(frame0[i], frame1[i], alpha))  ;
+    interpolatedFrame.push_back(slerpLerp(frame0[i], frame1[i], alpha));
 
   }
 
@@ -836,6 +881,72 @@ bool interpolateAndDisplay(double t) {
   glutPostRedisplay();
 
   return frame1Index == g_keyFrames.size() - 1 ;
+}
+
+// Given t in the range [0..n], perform interpolation and draw the scene for the particular t.
+// Returns true if we are at the end of the animation sequence or false otherwise
+bool catmullRomInterpolateAndDisplay(double t) {
+  double alpha = t - floor(t);
+
+  // We assume that our keyframe indices start from -1 to n, but the allowed range is
+  // [0, n-1]. Therefore, frame with index 0 would be -1. So if t = 0.5,
+  // this means that the following:
+  // index of ci-1 would be 0
+  // index of ci would be 1
+  // index of ci+1 would be 2
+  // index of ci+2 would be 3
+
+  // ci-1
+  int c_minusIndex = floor(t);
+  // ci
+  int cIndex = floor(t) + 1;
+  // ci + 1
+  int c_plusIndex = floor(t) + 2;
+  // ci+2
+  int c_plus2Index = floor(t) + 3;
+
+  // initialize iterator at element 0
+  list<vector<RigTForm> >::iterator iterator = g_keyFrames.begin();
+
+  // move iterator to ci-1
+  advance(iterator, c_minusIndex);
+
+  vector<RigTForm> c_minusFrame = *iterator;
+
+  // move iterator to ci
+  iterator++;
+
+  vector<RigTForm> cFrame = *iterator;
+
+  // move iterator to ci+1
+  iterator++;
+
+  vector<RigTForm> c_plusFrame = *iterator;
+
+  // move iterator to ci+2
+  iterator++;
+
+  vector<RigTForm> c_plus2Frame = *iterator;
+
+  vector<RigTForm> interpolatedFrame;
+
+  // Loop through frame0 and frame1 at the same time. At each index,
+  // calculate the newRbt by slerp and lerp and push it to interpolatedFrame.
+  for (size_t i = 0; i < c_minusFrame.size(); i++) {
+
+    interpolatedFrame.push_back(
+      catmullRomInterpolate(c_minusFrame[i], cFrame[i], c_plusFrame[i], c_plus2Frame[i], alpha)
+    );
+
+  }
+
+  // copy the interpolated frame to scenegraph
+  copyKeyFrameToSceneGraph(interpolatedFrame);
+
+  //Redraw scene
+  glutPostRedisplay();
+
+  return c_plus2Index == g_keyFrames.size() - 1 ;
 }
 
 // _____________________________________________________
@@ -1083,6 +1194,18 @@ static void keyboard(const unsigned char key, const int x, const int y) {
   case 'w':
     onWClick();
     break;
+  case 't':
+    // toggle animation type. 0 is standard. 1 is catmull-rom.
+    g_animationType = (g_animationType == 0) ? 1 : 0;
+    string type;
+    if (g_animationType == 0) {
+      type = "standard";
+    }
+    else {
+      type = "Catmull-Rom";
+    }
+    cout << "Switched animation type to " << type << '\n';
+    break;
   }
   glutPostRedisplay();
 }
@@ -1099,14 +1222,17 @@ static void keyboard(const unsigned char key, const int x, const int y) {
 static void animateTimerCallback(int ms) {
 
   double t = (double) ms / (double) g_msBetweenKeyFrames;
-  bool endReached = interpolateAndDisplay(t);
+
+  // toggle between standard animation (g_animationType=0) and catmull-rom splines (g_animationType=1).
+  bool endReached = g_animationType == 0 ? interpolateAndDisplay(t) : catmullRomInterpolateAndDisplay(t);
+
   if(!endReached && g_animationRunning){
     glutTimerFunc(1000 / g_animateFramesPerSecond, animateTimerCallback, ms + 1000/g_animateFramesPerSecond);
   }
   else {
     g_animationRunning = false;
+    cout << "Animation sequence has ended." << '\n';
   }
-
 }
 
 // _____________________________________________________
