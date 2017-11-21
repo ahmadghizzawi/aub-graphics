@@ -187,7 +187,6 @@ inline Quat cn(const Quat& q) {
 inline Quat pow(const Quat q_, const double alpha) {
   // normalize the last three entries to get the unit axis k
   //  retrieve theta from the first value using atan2
-  cout << q_[0] << q_[1] << q_[2] << q_[3] << '\n';
   Cvec3 k = Cvec3(q_[1], q_[2], q_[3]).normalize();
 
   // sin(x/2) is the norm of the last three elements

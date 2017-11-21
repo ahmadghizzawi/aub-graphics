@@ -1,14 +1,14 @@
 // _____________________________________________________
 //|                                                     |
 //|  Ahmad Ghizzawi - Chukri Soueidi                    |
-//|  Assigntment IV - CMPS 385                         |
+//|  Assigntment V - CMPS 385                           |
 //|____________________________________________________ |
 
+#include <list>
 #include <memory>
 #include <stdexcept>
 #include <string>
 #include <vector>
-#include <list>
 
 #ifdef __MAC__
 #include <OpenGL/gl3.h>
@@ -20,17 +20,17 @@
 #endif
 
 #include "headers/arcball.h"
+#include "headers/asstcommon.h"
 #include "headers/cvec.h"
+#include "headers/drawer.h"
 #include "headers/geometrymaker.h"
 #include "headers/glsupport.h"
 #include "headers/matrix4.h"
+#include "headers/picker.h"
 #include "headers/ppm.h"
 #include "headers/quat.h"
 #include "headers/rigtform.h"
 #include "headers/scenegraph.h"
-#include "headers/asstcommon.h"
-#include "headers/drawer.h"
-#include "headers/picker.h"
 #include "headers/sgutils.h"
 using namespace std; // for string, vector, iostream, smart pointers, and other
                      // standard C++ stuff
@@ -76,14 +76,14 @@ static double g_arcballScale = 1.0;
 
 static bool g_pickObject = false;
 
-static const int PICKING_SHADER = 2; // index of the picking shader is g_shaderFiles
+static const int PICKING_SHADER =
+    2; // index of the picking shader is g_shaderFiles
 static const int g_numShaders = 3; // 3 shaders instead of 2
 
 static const char *const g_shaderFiles[g_numShaders][2] = {
     {"./shaders/basic-gl3.vshader", "./shaders/diffuse-gl3.fshader"},
     {"./shaders/basic-gl3.vshader", "./shaders/solid-gl3.fshader"},
-    {"./shaders/basic-gl3.vshader", "./shaders/pick-gl3.fshader"}
-  };
+    {"./shaders/basic-gl3.vshader", "./shaders/pick-gl3.fshader"}};
 
 // our global shader states
 static vector<shared_ptr<ShaderState> > g_shaderStates;
@@ -172,7 +172,8 @@ static shared_ptr<Geometry> g_ground, g_cube, g_cube_1, g_arcball;
 static const Cvec3 g_light1(2.0, 3.0, 14.0), g_light2(-2, -3.0, -5.0);
 
 static shared_ptr<SgRootNode> g_world;
-static shared_ptr<SgRbtNode> g_skyNode, g_groundNode, g_robot1Node, g_robot2Node;
+static shared_ptr<SgRbtNode> g_skyNode, g_groundNode, g_robot1Node,
+    g_robot2Node;
 // current picked object. Default is sky
 static shared_ptr<SgRbtNode> g_currentPickedRbtNode;
 // current view. Default is sky
@@ -197,7 +198,7 @@ static int g_animateFramesPerSecond = 60;
 static bool g_animationRunning = false;
 static int g_animationType = 1; // 0 is standard lerp/slerp. 1 is catmull-rom.
 
-//Import Export Key Frame Variable
+// Import Export Key Frame Variable
 
 static const string keyFramesFileName = "key.frames";
 static const char SERIALIZATION_DELIMITER = ' ';
@@ -209,7 +210,6 @@ static const char SERIALIZATION_DELIMITER = ' ';
 ///
 
 static void animateTimerCallback(int ms);
-
 
 static void initGround() {
   // A x-z plane at y = g_groundY of dimension [-g_groundSize, g_groundSize]^2
@@ -248,7 +248,6 @@ static void initArcball() {
   // Temporary storage for cube geometry
   vector<VertexPN> vtx(vbLen);
   vector<unsigned short> idx(ibLen);
-
 
   makeSphere(1, slices, stacks, vtx.begin(), idx.begin());
   g_arcball.reset(new Geometry(&vtx[0], &idx[0], vbLen, ibLen));
@@ -310,12 +309,14 @@ static RigTForm getEyeRbt() {
 
 // Returns true if active object and eye are the SKY camera wrt world-sky frame.
 static bool isWorldSkyFrameActive() {
-  return (g_currentPickedRbtNode == g_skyNode && g_activeEye == SKY && g_worldSkyFrame);
+  return (g_currentPickedRbtNode == g_skyNode && g_activeEye == SKY &&
+          g_worldSkyFrame);
 }
 
 // Returns true if active object is a cube and isn't wrt to itself.
 static bool isCubeActive() {
-  return g_currentPickedRbtNode != g_skyNode && g_currentPickedRbtNode != g_currentView;
+  return g_currentPickedRbtNode != g_skyNode &&
+         g_currentPickedRbtNode != g_currentView;
 }
 
 // Arcball interface will come into place under two conditions only:
@@ -346,13 +347,8 @@ static RigTForm getArcballRotation(int current_x, int current_y) {
 
   // Get the sphere's center in Screen coordinates
   Cvec2 screenSpaceCoordinates = getScreenSpaceCoord(
-    (inv(eyeRbt) * object).getTranslation(),
-    makeProjectionMatrix(),
-    g_frustNear,
-    g_frustFovY,
-    g_windowWidth,
-    g_windowHeight
-  );
+      (inv(eyeRbt) * object).getTranslation(), makeProjectionMatrix(),
+      g_frustNear, g_frustFovY, g_windowWidth, g_windowHeight);
 
   Cvec3 sphereCenter = Cvec3(screenSpaceCoordinates, 0);
 
@@ -363,25 +359,30 @@ static RigTForm getArcballRotation(int current_x, int current_y) {
   Cvec3 point2 = Cvec3(current_x, current_y, 0) - sphereCenter;
 
   // z = sqrt((radius)^2 - (x - cx)^2 - (y - cy)^2)
-  Cvec3 vector1 = normalize(Cvec3(point1[0], point1[1], sqrt(max(0.0, pow(g_arcballScreenRadius, 2) - pow(point1[0], 2) - pow(point1[1], 2)))));
+  Cvec3 vector1 = normalize(
+      Cvec3(point1[0], point1[1],
+            sqrt(max(0.0, pow(g_arcballScreenRadius, 2) - pow(point1[0], 2) -
+                              pow(point1[1], 2)))));
 
   // z = sqrt((radius)^2 - (x - cx)^2 - (y - cy)^2)
-  Cvec3 vector2 = normalize(Cvec3(point2[0], point2[1], sqrt(max(0.0, pow(g_arcballScreenRadius, 2) - pow(point2[0], 2) - pow(point2[1], 2)))));
-
+  Cvec3 vector2 = normalize(
+      Cvec3(point2[0], point2[1],
+            sqrt(max(0.0, pow(g_arcballScreenRadius, 2) - pow(point2[0], 2) -
+                              pow(point2[1], 2)))));
 
   if (isWorldSkyFrameActive()) {
     return RigTForm(Quat(0, vector1 * -1.0) * Quat(0, vector2));
-  }
-  else {
+  } else {
     return RigTForm(Quat(0, vector2) * Quat(0, vector1 * -1.0));
   }
 }
 
-static void drawArcball(const ShaderState& curSS, const RigTForm& invEyeRbt) {
+static void drawArcball(const ShaderState &curSS, const RigTForm &invEyeRbt) {
   // draw wireframe
   glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
   const double scalingValue = g_arcballScale * g_arcballScreenRadius;
-  const Matrix4 scale = Matrix4::makeScale(Cvec3(scalingValue, scalingValue, scalingValue));
+  const Matrix4 scale =
+      Matrix4::makeScale(Cvec3(scalingValue, scalingValue, scalingValue));
   Matrix4 MVM = rigTFormToMatrix(invEyeRbt * getArcballRbt()) * scale;
   Matrix4 NMVM = normalMatrix(MVM);
   sendModelViewNormalMatrix(curSS, MVM, NMVM);
@@ -391,7 +392,7 @@ static void drawArcball(const ShaderState& curSS, const RigTForm& invEyeRbt) {
   glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 }
 
-static void drawStuff(const ShaderState& curSS, bool picking) {
+static void drawStuff(const ShaderState &curSS, bool picking) {
   // build & send proj. matrix to vshader
   const Matrix4 projmat = makeProjectionMatrix();
   sendProjectionMatrix(curSS, projmat);
@@ -414,14 +415,14 @@ static void drawStuff(const ShaderState& curSS, bool picking) {
   //
 
   if (!picking) {
-      Drawer drawer(invEyeRbt, curSS);
-      g_world->accept(drawer);
-  }
-  else {
+    Drawer drawer(invEyeRbt, curSS);
+    g_world->accept(drawer);
+  } else {
     Picker picker(invEyeRbt, curSS);
     g_world->accept(picker);
     glFlush();
-    g_currentPickedRbtNode = picker.getRbtNodeAtXY(g_mouseClickX, g_mouseClickY);
+    g_currentPickedRbtNode =
+        picker.getRbtNodeAtXY(g_mouseClickX, g_mouseClickY);
     if (g_currentPickedRbtNode == g_groundNode)
       g_currentPickedRbtNode = g_skyNode;
   }
@@ -430,15 +431,14 @@ static void drawStuff(const ShaderState& curSS, bool picking) {
   // ==========
   //
   if (isArcballActive()) {
-      if (!g_mouseMClickButton && !(g_mouseLClickButton && g_mouseRClickButton) && !(g_spaceDown)) {
-        g_arcballScale = getScreenToEyeScale(
-             (inv(getEyeRbt()) * getArcballRbt()).getTranslation()[2],
-             g_frustFovY,
-             g_windowHeight
-          );
-      }
+    if (!g_mouseMClickButton && !(g_mouseLClickButton && g_mouseRClickButton) &&
+        !(g_spaceDown)) {
+      g_arcballScale = getScreenToEyeScale(
+          (inv(getEyeRbt()) * getArcballRbt()).getTranslation()[2], g_frustFovY,
+          g_windowHeight);
+    }
 
-      drawArcball(curSS, invEyeRbt);
+    drawArcball(curSS, invEyeRbt);
   }
 }
 
@@ -456,11 +456,10 @@ static void pick() {
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   drawStuff(*g_shaderStates[PICKING_SHADER], true);
 
-  // Uncomment below and comment out the glutPostRedisplay in mouse(...) call back
-  // to see result of the pick rendering pass
-  // glutSwapBuffers();
+  // Uncomment below and comment out the glutPostRedisplay in mouse(...) call
+  // back to see result of the pick rendering pass glutSwapBuffers();
 
-  //Now set back the clear color
+  // Now set back the clear color
   glClearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
 
   checkGlErrors();
@@ -471,14 +470,17 @@ static void manipulateObjects(RigTForm &Q) {
 
   // Active eye is sky and active object is a cube.
   if (isCubeActive() && g_activeEye == SKY) {
-    RigTForm A = makeMixedFrame(g_currentPickedRbtNode->getRbt(), g_currentView->getRbt());
-    g_currentPickedRbtNode->setRbt(doQtoOwrtA(Q, g_currentPickedRbtNode->getRbt(), A));
+    RigTForm A = makeMixedFrame(g_currentPickedRbtNode->getRbt(),
+                                g_currentView->getRbt());
+    g_currentPickedRbtNode->setRbt(
+        doQtoOwrtA(Q, g_currentPickedRbtNode->getRbt(), A));
   }
   // Active eye and object are cubes.
   else if (isCubeActive()) {
-    RigTForm A =
-        makeMixedFrame(g_currentPickedRbtNode->getRbt(), g_currentView->getRbt());
-    g_currentPickedRbtNode->setRbt(doQtoOwrtA(Q, g_currentPickedRbtNode->getRbt(), A));
+    RigTForm A = makeMixedFrame(g_currentPickedRbtNode->getRbt(),
+                                g_currentView->getRbt());
+    g_currentPickedRbtNode->setRbt(
+        doQtoOwrtA(Q, g_currentPickedRbtNode->getRbt(), A));
   }
   // Active eye and object is sky.
   else {
@@ -541,38 +543,38 @@ static void copyKeyFrameToSceneGraph(vector<RigTForm> keyFrame) {
   int index = 0;
   // -1 = currentKeyFrame is undefined
   if (isCurrentFrameDefined()) {
-      // Loop over all pointers to SgRbtNodes
-      for ( vector<shared_ptr<SgRbtNode> >::iterator i = g_rbtNodes.begin(); i != g_rbtNodes.end(); i++ ) {
+    // Loop over all pointers to SgRbtNodes
+    for (vector<shared_ptr<SgRbtNode> >::iterator i = g_rbtNodes.begin();
+         i != g_rbtNodes.end(); i++) {
 
-        // initialize iterator at element 0
-        vector<RigTForm>::iterator rigTForm = keyFrame.begin();
+      // initialize iterator at element 0
+      vector<RigTForm>::iterator rigTForm = keyFrame.begin();
 
-        // move iterator to frame at index x
-        advance(rigTForm, index);
+      // move iterator to frame at index x
+      advance(rigTForm, index);
 
-        dynamic_pointer_cast<SgRbtNode>(*i)->setRbt(*rigTForm);
+      dynamic_pointer_cast<SgRbtNode>(*i)->setRbt(*rigTForm);
 
-        index++;
-      }
-  }
-  else {
+      index++;
+    }
+  } else {
     cout << "Current keyframe is not defined." << '\n';
   }
 }
 
-
 static void copySceneGraphToKeyFrame(vector<RigTForm> &newKeyFrame) {
   newKeyFrame.clear();
   // Loop over all pointers to SgRbtNodes
-  for ( vector<shared_ptr<SgRbtNode> >::iterator rbtNodesIterator = g_rbtNodes.begin(); rbtNodesIterator != g_rbtNodes.end(); rbtNodesIterator++ ) {
+  for (vector<shared_ptr<SgRbtNode> >::iterator rbtNodesIterator =
+           g_rbtNodes.begin();
+       rbtNodesIterator != g_rbtNodes.end(); rbtNodesIterator++) {
     newKeyFrame.push_back((*rbtNodesIterator)->getRbt());
-
   }
   cout << "Copied scence graph to keyframe." << '\n';
 }
 
 static void onSpaceClick() {
-  if(isCurrentFrameDefined()) {
+  if (isCurrentFrameDefined()) {
     copyKeyFrameToSceneGraph(*g_currentKeyFrame);
   }
 }
@@ -594,20 +596,19 @@ static void onNClick() {
 static void onUClick() {
   // -1 = currentKeyFrame is undefined
   if (isCurrentFrameDefined()) {
-      copySceneGraphToKeyFrame(*g_currentKeyFrame);
-  }
-  else {
+    copySceneGraphToKeyFrame(*g_currentKeyFrame);
+  } else {
     cout << "Current keyframe is not defined." << '\n';
     onNClick();
   }
 }
 
 static void onNextClick() {
-  if (isCurrentFrameDefined() && g_currentKeyFrame != getLastKeyFrameIterator()) {
+  if (isCurrentFrameDefined() &&
+      g_currentKeyFrame != getLastKeyFrameIterator()) {
     g_currentKeyFrame++;
     copyKeyFrameToSceneGraph(*g_currentKeyFrame);
-  }
-  else if (isCurrentFrameDefined()){
+  } else if (isCurrentFrameDefined()) {
     copyKeyFrameToSceneGraph(*g_currentKeyFrame);
   } else {
     cout << "Current keyframe is not defined." << '\n';
@@ -618,36 +619,32 @@ static void onRetreatClick() {
   if (g_currentKeyFrame != g_keyFrames.begin()) {
     g_currentKeyFrame--;
     copyKeyFrameToSceneGraph(*g_currentKeyFrame);
-  }
-  else if (isCurrentFrameDefined()){
+  } else if (isCurrentFrameDefined()) {
     copyKeyFrameToSceneGraph(*g_currentKeyFrame);
   } else {
     cout << "Current keyframe is not defined." << '\n';
   }
 }
 
-static void onDClick()
-{
-  if (isCurrentFrameDefined())
-  {
+static void onDClick() {
+  if (isCurrentFrameDefined()) {
     list<vector<RigTForm> >::iterator frametoDelete = g_currentKeyFrame;
-    //Advance the iterator to the next element
+    // Advance the iterator to the next element
     g_currentKeyFrame++;
     // Remove the currentKeyFrame from the list
     g_keyFrames.erase(frametoDelete);
 
-    //If the list of keyframes is empty, do nothing
-    if(!g_keyFrames.empty()){
+    // If the list of keyframes is empty, do nothing
+    if (!g_keyFrames.empty()) {
 
-       //when g_currentKeyFrame == g_keyFrames.begin(), it means the deleted frame was the first element
-       //If not set the current key Frame to the one immediately after the deleted frame
-       if(g_currentKeyFrame != g_keyFrames.begin() ){
-         g_currentKeyFrame--;
-       }
+      // when g_currentKeyFrame == g_keyFrames.begin(), it means the deleted
+      // frame was the first element  If not set the current key Frame to the
+      // one immediately after the deleted frame
+      if (g_currentKeyFrame != g_keyFrames.begin()) {
+        g_currentKeyFrame--;
+      }
 
-       copyKeyFrameToSceneGraph(*g_currentKeyFrame);
-
-
+      copyKeyFrameToSceneGraph(*g_currentKeyFrame);
     }
   }
 }
@@ -657,20 +654,18 @@ static void onDClick()
 //  starts the animation sequence
 // else
 //  pauses the animation.
-static void onYClick(){
-  if(g_keyFrames.size() > 4)
-  {
-    if (!g_animationRunning   ) {
+static void onYClick() {
+  if (g_keyFrames.size() > 4) {
+    if (!g_animationRunning) {
       cout << "Started playing the animation. " << '\n';
       g_animationRunning = true;
       g_animateFramesPerSecond = 60;
       animateTimerCallback(0);
-    }
-    else {
+    } else {
       g_animationRunning = false;
       cout << "Stopped playing the animation. " << '\n';
     }
-  }else{
+  } else {
     cout << "Shold have at least 4 frames to play the animation. " << '\n';
   }
 }
@@ -681,88 +676,87 @@ static void onYClick(){
 static void onPlusClick() {
   if (g_msBetweenKeyFrames - 100 > 0) {
     g_msBetweenKeyFrames = g_msBetweenKeyFrames - 100;
-    cout << "Decreased time between frames to: " << g_msBetweenKeyFrames << "ms" << '\n';
+    cout << "Decreased time between frames to: " << g_msBetweenKeyFrames << "ms"
+         << '\n';
   }
 }
 
 // Handler function for -
-// Should make the animation go slower by adding more one interpolated frame between
-// each pairs of keyframes
+// Should make the animation go slower by adding more one interpolated frame
+// between each pairs of keyframes
 static void onMinusClick() {
   g_msBetweenKeyFrames = g_msBetweenKeyFrames + 100;
-  cout << "Increased time between frames to: " << g_msBetweenKeyFrames << "ms" << '\n';
+  cout << "Increased time between frames to: " << g_msBetweenKeyFrames << "ms"
+       << '\n';
 }
 
 static void onWClick() {
 
-    ofstream exportFile;
-    exportFile.open(keyFramesFileName.c_str());
+  ofstream exportFile;
+  exportFile.open(keyFramesFileName.c_str());
 
-    string toInsert = "";
-    for (list<vector<RigTForm> >::iterator vectorIter = g_keyFrames.begin(); vectorIter != g_keyFrames.end(); vectorIter++) {
+  string toInsert = "";
+  for (list<vector<RigTForm> >::iterator vectorIter = g_keyFrames.begin();
+       vectorIter != g_keyFrames.end(); vectorIter++) {
 
-      stringstream s;
-      for (int i = 0; i < (*vectorIter).size(); i++) {
-         s << (*vectorIter)[i].serialize();
-        if (i != (*vectorIter).size() - 1) s << SERIALIZATION_DELIMITER;
-      }
-      toInsert += s.str() + "\n";
-
+    stringstream s;
+    for (int i = 0; i < (*vectorIter).size(); i++) {
+      s << (*vectorIter)[i].serialize();
+      if (i != (*vectorIter).size() - 1)
+        s << SERIALIZATION_DELIMITER;
     }
-
-    exportFile << toInsert;
-    exportFile.close();
-
-     cout << "Exported saved key frames to " << keyFramesFileName << '\n';
+    toInsert += s.str() + "\n";
   }
 
-static void onIClick(){
+  exportFile << toInsert;
+  exportFile.close();
 
-    //Open key frames file
-    ifstream importFile;
-    importFile.open(keyFramesFileName.c_str());
+  cout << "Exported saved key frames to " << keyFramesFileName << '\n';
+}
 
-    if (importFile == NULL) {
-      cout << "File not available" << '\n';
+static void onIClick() {
 
+  // Open key frames file
+  ifstream importFile;
+  importFile.open(keyFramesFileName.c_str());
+
+  if (importFile == NULL) {
+    cout << "File not available" << '\n';
+  }
+
+  vector<string> lines = vector<string>();
+
+  // Get all lines
+  string line;
+  while (getline(importFile, line)) {
+    lines.push_back(line);
+  }
+
+  importFile.close();
+
+  // We need to get each line and transform it into a vector of RigTForm
+  list<vector<RigTForm> > importedFrames;
+
+  for (int i = 0; i < lines.size(); i++) {
+
+    vector<string> lineRBTs = split(lines[i], SERIALIZATION_DELIMITER);
+    assert(lineRBTs.size() > 0);
+    vector<RigTForm> allRbts = vector<RigTForm>();
+    // after getting the vector we need to deserialize to RBT
+    for (int i = 0; i < lineRBTs.size(); i++) {
+      allRbts.push_back(RigTForm::deserialize(lineRBTs[i]));
     }
+    importedFrames.push_back(allRbts);
+  }
 
-    vector<string> lines = vector<string>();
+  // Move new list to the g_keyFrames list
+  g_keyFrames = importedFrames;
+  // Set the current key frame to the first frame in imported list
+  g_currentKeyFrame = g_keyFrames.begin();
+  // Apply the new frames
+  copyKeyFrameToSceneGraph(*(++g_currentKeyFrame));
 
-    //Get all lines
-    string line;
-    while (getline(importFile, line))
-    {
-      lines.push_back(line);
-    }
-
-    importFile.close();
-
-    //We need to get each line and transform it into a vector of RigTForm
-    list<vector<RigTForm> > importedFrames;
-
-    for (int i = 0; i < lines.size(); i++) {
-
-      vector<string> lineRBTs = split(lines[i], SERIALIZATION_DELIMITER);
-      assert(lineRBTs.size() > 0);
-      vector<RigTForm> allRbts = vector<RigTForm>();
-      //after getting the vector we need to deserialize to RBT
-      for (int i = 0; i < lineRBTs.size(); i++) {
-         allRbts.push_back(RigTForm::deserialize(lineRBTs[i]));
-      }
-      importedFrames.push_back(allRbts);
-
-    }
-
-    //Move new list to the g_keyFrames list
-    g_keyFrames =   importedFrames;
-    //Set the current key frame to the first frame in imported list
-    g_currentKeyFrame = g_keyFrames.begin();
-    //Apply the new frames
-    copyKeyFrameToSceneGraph(*g_currentKeyFrame);
-
-     cout << "Imported key frames from " << keyFramesFileName <<'\n';
-
+  cout << "Imported key frames from " << keyFramesFileName << '\n';
 }
 
 // _____________________________________________________
@@ -780,7 +774,7 @@ static Cvec3 lerp(Cvec3 c0, Cvec3 c1, double alpha) {
 // Spherical Linear interpolation
 // Returns an interpolated Quat based on the alpha provided.
 static Quat slerp(Quat q0, Quat q1, double alpha) {
-  if (q0[0] == q1[0] && q0[1] == q1[1] && q0[2] == q1[2] && q0[3] == q1[3])
+  if (q0 == q1)
     return q0;
 
   return pow(cn(q1 * inv(q0)), alpha) * q0;
@@ -789,42 +783,47 @@ static Quat slerp(Quat q0, Quat q1, double alpha) {
 // Takes in 2 rbts and does a linear interpolation between them  based on
 // alpha[0...1]
 // Returns the new rbt
-static RigTForm slerpLerp(RigTForm rbt0, RigTForm rbt1, double alpha){
+static RigTForm slerpLerp(RigTForm rbt0, RigTForm rbt1, double alpha) {
   RigTForm newRbt;
-  newRbt.setTranslation( lerp (rbt0.getTranslation(), rbt1.getTranslation(), alpha ));
-  newRbt.setRotation( slerp (rbt0.getRotation(), rbt1.getRotation(), alpha ));
+  newRbt.setTranslation(
+      lerp(rbt0.getTranslation(), rbt1.getTranslation(), alpha));
+  newRbt.setRotation(slerp(rbt0.getRotation(), rbt1.getRotation(), alpha));
 
   return newRbt;
 }
 
 // Takes in ci-1, ci, ci+1, and ci+2 as arguments and calculates control points
 // di and ei.
-// Returns a RigTForm vector of size 2 that contains control point d at 0 and e at index 1
-static vector<RigTForm> controlPoints(RigTForm c_minus, RigTForm c, RigTForm c_plus, RigTForm c_plus2) {
-
-
+// Returns a RigTForm vector of size 2 that contains control point d at 0 and e
+// at index 1
+static vector<RigTForm> controlPoints(RigTForm c_minus, RigTForm c,
+                                      RigTForm c_plus, RigTForm c_plus2) {
   Cvec3 translation;
   Quat rotation;
 
   // Calculating control points values based on the formula below.
   // controlPoint = pow(ci+1*c-1, 1/6) * ci
   // Control point e is negated as described in the book.
-  translation = (c_plus.getTranslation() - c_minus.getTranslation()) * (1/6) + c.getTranslation();
-  if(c_minus.getRotation() == c_plus.getRotation()) {
+  // calculate d
+  translation = ((c_plus.getTranslation() - c_minus.getTranslation()) * (1 / 6)) +
+                c.getTranslation();
+  if (c_minus.getRotation() == c_plus.getRotation()) {
     rotation = c.getRotation();
-  }
-  else {
-    rotation = pow(cn(c_plus.getRotation() * inv(c_minus.getRotation())), 1/6) * c.getRotation();
+  } else {
+    rotation =
+        pow(cn(c_plus.getRotation() * inv(c_minus.getRotation())), 1 / 6) *
+        c.getRotation();
   }
   RigTForm d = RigTForm(translation, rotation);
 
-
-  translation = (c_plus2.getTranslation() - c.getTranslation()) * (-1/6) + c_plus.getTranslation();
-  if(c_minus.getRotation() == c_plus.getRotation()) {
-    rotation = c.getRotation();
-  }
-  else {
-    rotation = pow(cn(c_plus2.getRotation() * inv(c.getRotation())), -1/6) * c_plus.getRotation();
+  // calculate e
+  translation = (c_plus2.getTranslation() - c.getTranslation()) * (-1 / 6) +
+                c_plus.getTranslation();
+  if (c_plus2.getRotation() == c.getRotation()) {
+    rotation = c_plus.getRotation();
+  } else {
+    rotation = pow(cn(c_plus2.getRotation() * inv(c.getRotation())), -1 / 6) *
+               c_plus.getRotation();
   }
 
   RigTForm e = RigTForm(translation, rotation);
@@ -837,8 +836,11 @@ static vector<RigTForm> controlPoints(RigTForm c_minus, RigTForm c, RigTForm c_p
 }
 
 // Takes in 4 rbts and does a linear interpolation using Catmull-Rom splines.
-static RigTForm catmullRomInterpolate(RigTForm c_minus, RigTForm c, RigTForm c_plus, RigTForm c_plus2, double alpha) {
-  vector<RigTForm> controlPointsVec = controlPoints(c_minus, c, c_plus, c_plus2);
+static RigTForm catmullRomInterpolate(RigTForm c_minus, RigTForm c,
+                                      RigTForm c_plus, RigTForm c_plus2,
+                                      double alpha) {
+  vector<RigTForm> controlPointsVec =
+      controlPoints(c_minus, c, c_plus, c_plus2);
 
   const RigTForm d = controlPointsVec[0];
   const RigTForm e = controlPointsVec[1];
@@ -852,16 +854,17 @@ static RigTForm catmullRomInterpolate(RigTForm c_minus, RigTForm c, RigTForm c_p
   return slerpLerp(m, n, alpha);
 }
 
-// Given t in the range [0..n], perform interpolation and draw the scene for the particular t.
-// Returns true if we are at the end of the animation sequence or false otherwise
+// Given t in the range [0..n], perform interpolation and draw the scene for the
+// particular t. Returns true if we are at the end of the animation sequence or
+// false otherwise
 bool interpolateAndDisplay(double t) {
   double alpha = t - floor(t);
   int frame0Index = floor(t);
   int frame1Index = floor(t) + 1;
 
-  // We assume that our keyframe indices start from -1 to n, but the allowed range is
-  // [0, n-1]. Therefore, frame with index 0 would be -1. So if t = 0.5,
-  // this means that the index of frame 0 would be 1 and frame 1 would be 2
+  // We assume that our keyframe indices start from -1 to n, but the allowed
+  // range is [0, n-1]. Therefore, frame with index 0 would be -1. So if t =
+  // 0.5, this means that the index of frame 0 would be 1 and frame 1 would be 2
   ++frame0Index;
   ++frame1Index;
 
@@ -885,30 +888,27 @@ bool interpolateAndDisplay(double t) {
   for (size_t i = 0; i < frame0.size(); i++) {
 
     interpolatedFrame.push_back(slerpLerp(frame0[i], frame1[i], alpha));
-
   }
 
   // copy the interpolated frame to scenegraph
   copyKeyFrameToSceneGraph(interpolatedFrame);
 
-  //Redraw scene
+  // Redraw scene
   glutPostRedisplay();
 
-  return frame1Index == g_keyFrames.size() - 1 ;
+  return frame1Index == g_keyFrames.size() - 1;
 }
 
-// Given t in the range [0..n], perform interpolation and draw the scene for the particular t.
-// Returns true if we are at the end of the animation sequence or false otherwise
+// Given t in the range [0..n], perform interpolation and draw the scene for the
+// particular t. Returns true if we are at the end of the animation sequence or
+// false otherwise
 bool catmullRomInterpolateAndDisplay(double t) {
   double alpha = t - floor(t);
 
-  // We assume that our keyframe indices start from -1 to n, but the allowed range is
-  // [0, n-1]. Therefore, frame with index 0 would be -1. So if t = 0.5,
-  // this means that the following:
-  // index of ci-1 would be 0
-  // index of ci would be 1
-  // index of ci+1 would be 2
-  // index of ci+2 would be 3
+  // We assume that our keyframe indices start from -1 to n, but the allowed
+  // range is [0, n-1]. Therefore, frame with index 0 would be -1. So if t =
+  // 0.5, this means that the following: index of ci-1 would be 0 index of ci
+  // would be 1 index of ci+1 would be 2 index of ci+2 would be 3
 
   // ci-1
   int c_minusIndex = floor(t);
@@ -947,20 +947,17 @@ bool catmullRomInterpolateAndDisplay(double t) {
   // Loop through frame0 and frame1 at the same time. At each index,
   // calculate the newRbt by slerp and lerp and push it to interpolatedFrame.
   for (size_t i = 0; i < c_minusFrame.size(); i++) {
-
-    interpolatedFrame.push_back(
-      catmullRomInterpolate(c_minusFrame[i], cFrame[i], c_plusFrame[i], c_plus2Frame[i], alpha)
-    );
-
+    interpolatedFrame.push_back(catmullRomInterpolate(
+        c_minusFrame[i], cFrame[i], c_plusFrame[i], c_plus2Frame[i], alpha));
   }
 
   // copy the interpolated frame to scenegraph
   copyKeyFrameToSceneGraph(interpolatedFrame);
 
-  //Redraw scene
+  // Redraw scene
   glutPostRedisplay();
 
-  return c_plus2Index == g_keyFrames.size() - 1 ;
+  return c_plus2Index == (g_keyFrames.size() - 1);
 }
 
 // _____________________________________________________
@@ -1041,22 +1038,21 @@ static void motion(const int x, const int y) {
   }
 
   // Use g_arcballScale to scale translation when using arcball only.
- double translateFactor;
- if (isArcballActive()) {
-   translateFactor = g_arcballScale;
- } else {
-   translateFactor = 0.01;
- }
+  double translateFactor;
+  if (isArcballActive()) {
+    translateFactor = g_arcballScale;
+  } else {
+    translateFactor = 0.01;
+  }
 
   RigTForm m;
   // left button down?
   if (g_mouseLClickButton && !g_mouseRClickButton && !g_spaceDown) {
     if (isArcballActive()) {
       m = getArcballRotation(current_x, current_y);
-    }
-    else {
+    } else {
       m = RigTForm(Quat::makeXRotation(factor2 * factor * -dy) *
-          Quat::makeYRotation(factor2 * factor * dx));
+                   Quat::makeYRotation(factor2 * factor * dx));
     }
   }
   // right button down?
@@ -1066,12 +1062,10 @@ static void motion(const int x, const int y) {
   // middle or (left and right, or left + space)
   // button down?
   else if (g_mouseMClickButton ||
-             (g_mouseLClickButton && g_mouseRClickButton) ||
-             (g_mouseLClickButton && !g_mouseRClickButton &&
-              g_spaceDown)) {
+           (g_mouseLClickButton && g_mouseRClickButton) ||
+           (g_mouseLClickButton && !g_mouseRClickButton && g_spaceDown)) {
     m = RigTForm(Cvec3(0, 0, factor * -dy) * translateFactor);
   }
-
 
   // we always redraw if we changed the scene
   if (g_mouseClickDown) {
@@ -1095,7 +1089,9 @@ static void motion(const int x, const int y) {
 static void mouse(const int button, const int state, const int x, const int y) {
   g_mouseClickX = x;
   g_mouseClickY = g_windowHeight - y - 1; // conversion from GLUT
-                                          // window-coordinate-system to  static const char SERIALIZATION_DELIMITER = ' ';OpenGL
+                                          // window-coordinate-system to  static
+                                          // const char SERIALIZATION_DELIMITER
+                                          // = ' ';OpenGL
                                           // window-coordinate-system
 
   g_mouseLClickButton |= (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN);
@@ -1110,7 +1106,8 @@ static void mouse(const int button, const int state, const int x, const int y) {
       g_mouseLClickButton || g_mouseRClickButton || g_mouseMClickButton;
 
   // left button down?
-  if (g_mouseLClickButton && !g_mouseRClickButton && !g_spaceDown && g_pickObject) {
+  if (g_mouseLClickButton && !g_mouseRClickButton && !g_spaceDown &&
+      g_pickObject) {
     pick();
     g_pickObject = false;
   }
@@ -1214,8 +1211,7 @@ static void keyboard(const unsigned char key, const int x, const int y) {
     string type;
     if (g_animationType == 0) {
       type = "standard";
-    }
-    else {
+    } else {
       type = "Catmull-Rom";
     }
     cout << "Switched animation type to " << type << '\n';
@@ -1230,20 +1226,22 @@ static void keyboard(const unsigned char key, const int x, const int y) {
 //|_____________________________________________________|
 ///
 /// glutTimerFunc registers the timer callback func to be triggered in at least
-/// msecs milliseconds. The value parameter to the timer callback will be the value
-/// of the value parameter to glutTimerFunc.
+/// msecs milliseconds. The value parameter to the timer callback will be the
+/// value of the value parameter to glutTimerFunc.
 
 static void animateTimerCallback(int ms) {
 
-  double t = (double) ms / (double) g_msBetweenKeyFrames;
+  double t = (double)ms / (double)g_msBetweenKeyFrames;
 
-  // toggle between standard animation (g_animationType=0) and catmull-rom splines (g_animationType=1).
-  bool endReached = g_animationType == 0 ? interpolateAndDisplay(t) : catmullRomInterpolateAndDisplay(t);
+  // toggle between standard animation (g_animationType=0) and catmull-rom
+  // splines (g_animationType=1).
+  bool endReached = g_animationType == 0 ? interpolateAndDisplay(t)
+                                         : catmullRomInterpolateAndDisplay(t);
 
-  if(!endReached && g_animationRunning){
-    glutTimerFunc(1000 / g_animateFramesPerSecond, animateTimerCallback, ms + 1000/g_animateFramesPerSecond);
-  }
-  else {
+  if (!endReached && g_animationRunning) {
+    glutTimerFunc(1000 / g_animateFramesPerSecond, animateTimerCallback,
+                  ms + 1000 / g_animateFramesPerSecond);
+  } else {
     g_animationRunning = false;
     cout << "Animation sequence has ended." << '\n';
   }
@@ -1265,7 +1263,7 @@ static void initGlutState(int argc, char *argv[]) {
                       GLUT_DEPTH); //  RGBA pixel channels and double buffering
 #endif
   glutInitWindowSize(g_windowWidth, g_windowHeight); // create a window
-  glutCreateWindow("Assignment 4");                  // title the window
+  glutCreateWindow("Assignment 5");                  // title the window
 
   glutIgnoreKeyRepeat(true); // avoids repeated keyboard calls when holding
                              // space to emulate middle mouse
@@ -1304,18 +1302,13 @@ static void initGeometry() {
   initArcball();
 }
 
-static void constructRobot(shared_ptr<SgTransformNode> base, const Cvec3& color) {
+static void constructRobot(shared_ptr<SgTransformNode> base,
+                           const Cvec3 &color) {
 
-  const double ARM_LEN = 0.7,
-               ARM_THICK = 0.25,
-               TORSO_LEN = 1.5,
-               TORSO_THICK = 0.25,
-               TORSO_WIDTH = 1,
-               HEAD_RAD = 0.30,
-               LEG_LEN = 0.7,
-               LEG_THICK = 0.25;
-  const int NUM_JOINTS = 10,
-            NUM_SHAPES = 10;
+  const double ARM_LEN = 0.7, ARM_THICK = 0.25, TORSO_LEN = 1.5,
+               TORSO_THICK = 0.25, TORSO_WIDTH = 1, HEAD_RAD = 0.30,
+               LEG_LEN = 0.7, LEG_THICK = 0.25;
+  const int NUM_JOINTS = 10, NUM_SHAPES = 10;
 
   struct JointDesc {
     int parent;
@@ -1323,16 +1316,16 @@ static void constructRobot(shared_ptr<SgTransformNode> base, const Cvec3& color)
   };
 
   JointDesc jointDesc[NUM_JOINTS] = {
-    {-1}, // torso
-    {0,  TORSO_WIDTH/2, TORSO_LEN/2, 0},  // upper right arm
-    {1,  ARM_LEN, 0, 0},                  // lower right arm
-    {0, 0, TORSO_LEN/2, 0},               // head
-    {0,  -TORSO_WIDTH/2, TORSO_LEN/2, 0}, // upper left arm
-    {4,  -ARM_LEN, 0, 0},                 // lower left arm
-    {0,  TORSO_WIDTH/2, -TORSO_LEN/2, 0}, // upper right leg
-    {6,  0, -LEG_LEN, 0},                 // lower right leg
-    {0,  -TORSO_WIDTH/2, -TORSO_LEN/2, 0},// upper left leg
-    {8,  0, -LEG_LEN, 0}                  // lower left leg
+      {-1},                                     // torso
+      {0, TORSO_WIDTH / 2, TORSO_LEN / 2, 0},   // upper right arm
+      {1, ARM_LEN, 0, 0},                       // lower right arm
+      {0, 0, TORSO_LEN / 2, 0},                 // head
+      {0, -TORSO_WIDTH / 2, TORSO_LEN / 2, 0},  // upper left arm
+      {4, -ARM_LEN, 0, 0},                      // lower left arm
+      {0, TORSO_WIDTH / 2, -TORSO_LEN / 2, 0},  // upper right leg
+      {6, 0, -LEG_LEN, 0},                      // lower right leg
+      {0, -TORSO_WIDTH / 2, -TORSO_LEN / 2, 0}, // upper left leg
+      {8, 0, -LEG_LEN, 0}                       // lower left leg
   };
 
   struct ShapeDesc {
@@ -1342,16 +1335,24 @@ static void constructRobot(shared_ptr<SgTransformNode> base, const Cvec3& color)
   };
 
   ShapeDesc shapeDesc[NUM_SHAPES] = {
-    {0, 0,         0, 0, TORSO_WIDTH, TORSO_LEN, TORSO_THICK, g_cube}, // torso
-    {1, ARM_LEN/2, 0, 0, ARM_LEN, ARM_THICK, ARM_THICK, g_cube}, // upper right arm
-    {2, ARM_LEN/2, 0, 0, ARM_LEN, ARM_THICK, ARM_THICK, g_cube}, // lower right arm
-    {3, 0, HEAD_RAD, 0, HEAD_RAD, HEAD_RAD, HEAD_RAD, g_arcball}, // head
-    {4, -ARM_LEN/2, 0, 0, ARM_LEN, ARM_THICK, ARM_THICK, g_cube}, // upper left arm
-    {5, -ARM_LEN/2, 0, 0, ARM_LEN, ARM_THICK, ARM_THICK, g_cube}, // lower left arm
-    {6, 0, -LEG_LEN/2, 0, LEG_THICK, LEG_LEN, LEG_THICK, g_cube}, // upper right Leg
-    {7, 0, -LEG_LEN/2, 0, LEG_THICK, LEG_LEN, LEG_THICK, g_cube}, // lower right Leg
-    {8, 0, -LEG_LEN/2, 0, LEG_THICK, LEG_LEN, LEG_THICK, g_cube}, // upper left Leg
-    {9, 0, -LEG_LEN/2, 0, LEG_THICK, LEG_LEN, LEG_THICK, g_cube}, // lower left Leg
+      {0, 0, 0, 0, TORSO_WIDTH, TORSO_LEN, TORSO_THICK, g_cube}, // torso
+      {1, ARM_LEN / 2, 0, 0, ARM_LEN, ARM_THICK, ARM_THICK,
+       g_cube}, // upper right arm
+      {2, ARM_LEN / 2, 0, 0, ARM_LEN, ARM_THICK, ARM_THICK,
+       g_cube}, // lower right arm
+      {3, 0, HEAD_RAD, 0, HEAD_RAD, HEAD_RAD, HEAD_RAD, g_arcball}, // head
+      {4, -ARM_LEN / 2, 0, 0, ARM_LEN, ARM_THICK, ARM_THICK,
+       g_cube}, // upper left arm
+      {5, -ARM_LEN / 2, 0, 0, ARM_LEN, ARM_THICK, ARM_THICK,
+       g_cube}, // lower left arm
+      {6, 0, -LEG_LEN / 2, 0, LEG_THICK, LEG_LEN, LEG_THICK,
+       g_cube}, // upper right Leg
+      {7, 0, -LEG_LEN / 2, 0, LEG_THICK, LEG_LEN, LEG_THICK,
+       g_cube}, // lower right Leg
+      {8, 0, -LEG_LEN / 2, 0, LEG_THICK, LEG_LEN, LEG_THICK,
+       g_cube}, // upper left Leg
+      {9, 0, -LEG_LEN / 2, 0, LEG_THICK, LEG_LEN, LEG_THICK,
+       g_cube}, // lower left Leg
   };
 
   shared_ptr<SgTransformNode> jointNodes[NUM_JOINTS];
@@ -1360,17 +1361,16 @@ static void constructRobot(shared_ptr<SgTransformNode> base, const Cvec3& color)
     if (jointDesc[i].parent == -1)
       jointNodes[i] = base;
     else {
-      jointNodes[i].reset(new SgRbtNode(RigTForm(Cvec3(jointDesc[i].x, jointDesc[i].y, jointDesc[i].z))));
+      jointNodes[i].reset(new SgRbtNode(
+          RigTForm(Cvec3(jointDesc[i].x, jointDesc[i].y, jointDesc[i].z))));
       jointNodes[jointDesc[i].parent]->addChild(jointNodes[i]);
     }
   }
   for (int i = 0; i < NUM_SHAPES; ++i) {
-    shared_ptr<MyShapeNode> shape(
-      new MyShapeNode(shapeDesc[i].geometry,
-                      color,
-                      Cvec3(shapeDesc[i].x, shapeDesc[i].y, shapeDesc[i].z),
-                      Cvec3(0, 0, 0),
-                      Cvec3(shapeDesc[i].sx, shapeDesc[i].sy, shapeDesc[i].sz)));
+    shared_ptr<MyShapeNode> shape(new MyShapeNode(
+        shapeDesc[i].geometry, color,
+        Cvec3(shapeDesc[i].x, shapeDesc[i].y, shapeDesc[i].z), Cvec3(0, 0, 0),
+        Cvec3(shapeDesc[i].sx, shapeDesc[i].sy, shapeDesc[i].sz)));
     jointNodes[shapeDesc[i].parentJointId]->addChild(shape);
   }
 }
@@ -1382,7 +1382,7 @@ static void initScene() {
 
   g_groundNode.reset(new SgRbtNode());
   g_groundNode->addChild(shared_ptr<MyShapeNode>(
-                           new MyShapeNode(g_ground, Cvec3(0.1, 0.95, 0.1))));
+      new MyShapeNode(g_ground, Cvec3(0.1, 0.95, 0.1))));
 
   g_robot1Node.reset(new SgRbtNode(RigTForm(Cvec3(-2, 1, 0))));
   g_robot2Node.reset(new SgRbtNode(RigTForm(Cvec3(2, 1, 0))));
