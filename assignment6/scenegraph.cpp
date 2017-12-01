@@ -1,6 +1,6 @@
 #include <algorithm>
 
-#include "headers/scenegraph.h"
+#include "scenegraph.h"
 
 using namespace std;
 
@@ -34,30 +34,32 @@ protected:
   SgTransformNode& target_;
   bool found_;
 public:
-  RbtAccumVisitor(SgTransformNode& target) : target_(target) , found_(false) {}
+  RbtAccumVisitor(SgTransformNode& target)
+    : target_(target)
+    , found_(false) {}
 
   const RigTForm getAccumulatedRbt(int offsetFromStackTop = 0) {
-    // TODO
-    return rbtStack_[rbtStack_.size() - 1 - offsetFromStackTop];
+    if (!found_)
+      throw runtime_error("RbtAccumVisitor target never reached");
+    return rbtStack_[rbtStack_.size()-1-offsetFromStackTop];
   }
 
   virtual bool visit(SgTransformNode& node) {
-    // TODO
-    if (rbtStack_.empty()) {
-      rbtStack_.push_back(node.getRbt());
-    } else {
+    if (rbtStack_.empty())
+      rbtStack_.push_back(RigTForm());
+    else
       rbtStack_.push_back(rbtStack_.back() * node.getRbt());
-    }
 
-    return !(node == target_);
+    if (target_ == node) {
+      found_ = true;
+      return false;
+    }
+    return true;
   }
 
   virtual bool postVisit(SgTransformNode& node) {
-    // TODO
-    if (!rbtStack_.empty()) {
-      rbtStack_.pop_back();
-    }
-   return true;
+    rbtStack_.pop_back();
+    return true;
   }
 };
 

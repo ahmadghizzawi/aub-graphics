@@ -2,56 +2,58 @@
 # include <GL/glew.h>
 #endif
 
-#include "headers/picker.h"
+
+#include "uniforms.h"
+#include "picker.h"
 
 using namespace std;
 
-Picker::Picker(const RigTForm& initialRbt, const ShaderState& curSS)
-  : drawer_(initialRbt, curSS)
+Picker::Picker(const RigTForm& initialRbt, Uniforms& uniforms)
+  : drawer_(initialRbt, uniforms)
   , idCounter_(0)
   , srgbFrameBuffer_(true) {}
 
 bool Picker::visit(SgTransformNode& node) {
-  // Push back a shared_ptr of the passed node onto the stack.
   nodeStack_.push_back(node.shared_from_this());
   return drawer_.visit(node);
 }
 
 bool Picker::postVisit(SgTransformNode& node) {
-  // Pop the node from the back of the stack.
   nodeStack_.pop_back();
   return drawer_.postVisit(node);
 }
 
 bool Picker::visit(SgShapeNode& node) {
-  // increment id counter
   idCounter_++;
-  // Get the parent node (which should be an SgRbtNode object)
-  shared_ptr<SgRbtNode> parent = dynamic_pointer_cast<SgRbtNode>(nodeStack_.back());
-  // Associate the id with the parent
-  addToMap(idCounter_, parent);
-  // Retrieve the color of the object based on the id
-  Cvec3 objectColor = Picker::idToColor(idCounter_);
-  // Set the uniform variable to have the given color before drawing.
-  safe_glUniform3f(drawer_.getCurSS().h_uIdColor, objectColor[0], objectColor[1],
-                   objectColor[2]);
+  for (int i = nodeStack_.size() - 1; i >= 0; --i) {
+    shared_ptr<SgRbtNode> asRbtNode = dynamic_pointer_cast<SgRbtNode>(nodeStack_[i]);
+    if (asRbtNode) {
+      addToMap(idCounter_, asRbtNode);
+      break;
+    }
+  }
+  const Cvec3 idColor = idToColor(idCounter_);
 
+  // DEBUG OUTPUT
+  cerr << idCounter_ << " => " << idColor[0] << ' ' << idColor[1] << ' ' << idColor[2] << endl;
+
+  drawer_.getUniforms().put("uIdColor", idColor);
   return drawer_.visit(node);
 }
 
 bool Picker::postVisit(SgShapeNode& node) {
-  // TODO
   return drawer_.postVisit(node);
 }
 
 shared_ptr<SgRbtNode> Picker::getRbtNodeAtXY(int x, int y) {
-  // TODO
-  PackedPixel image;
-  // Takes a snapshot of a single pixel from the current buffer at the provided
-  // x/y coordinates
-  glReadPixels(x, y, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, &image);
-  // Search the map for the node coupled with the id retrieved from the selected color.
-  return find(colorToId(image));
+  PackedPixel query;
+  glReadPixels(x, y, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, &query);
+  const int id = colorToId(query);
+
+  // DEBUG OUTPUT
+  cerr << int(query.r) << ' ' << int(query.g) << ' ' << int(query.b) << " => " << id << endl;
+
+  return find(id);
 }
 
 //------------------

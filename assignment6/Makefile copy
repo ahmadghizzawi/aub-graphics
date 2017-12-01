@@ -1,4 +1,4 @@
-BASE = main
+BASE = asst6
 
 all: $(BASE)
 
