@@ -3,8 +3,8 @@
 #endif
 
 
-#include "uniforms.h"
-#include "picker.h"
+#include "headers/uniforms.h"
+#include "headers/picker.h"
 
 using namespace std;
 
