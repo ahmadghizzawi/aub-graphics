@@ -404,6 +404,9 @@ static void drawStuff(const ShaderState& curSS, bool picking) {
     g_currentPickedRbtNode = picker.getRbtNodeAtXY(g_mouseClickX, g_mouseClickY);
     if (g_currentPickedRbtNode == g_groundNode)
       g_currentPickedRbtNode = g_skyNode;
+    else if (!g_currentPickedRbtNode){
+      g_currentPickedRbtNode = g_skyNode;
+    }
   }
 
   // draw arcball
