@@ -301,15 +301,15 @@ static void drawArcball(Uniforms& uniforms, const RigTForm &invEyeRbt) {
   Matrix4 MVM = rigTFormToMatrix(invEyeRbt * getArcballRbt()) * scale;
   Matrix4 NMVM = normalMatrix(MVM);
   sendModelViewNormalMatrix(uniforms, MVM, NMVM);
-  
-  
-  uniforms.put("uColor", g_arcballColor);            
- 
+
+
+  uniforms.put("uColor", g_arcballColor);
+
   g_arcballMat->draw(*g_arcball, uniforms);
 }
 
 static void drawStuff(bool picking) {
-  
+
   Uniforms uniforms;
 
   // build & send proj. matrix to vshader
@@ -356,7 +356,7 @@ static void drawStuff(bool picking) {
   }
 
   } else {
-    
+
     Picker picker(invEyeRbt, uniforms);
 
       // set overiding material to our picking material
@@ -369,8 +369,12 @@ static void drawStuff(bool picking) {
     glFlush();
     g_currentPickedRbtNode =
         picker.getRbtNodeAtXY(g_mouseClickX, g_mouseClickY);
-    if (g_currentPickedRbtNode == g_groundNode)
+    if (g_currentPickedRbtNode == g_groundNode) {
       g_currentPickedRbtNode = g_skyNode;
+    }
+    else if (!g_currentPickedRbtNode){
+      g_currentPickedRbtNode = g_skyNode;
+    }
   }
 
 
@@ -909,7 +913,7 @@ bool catmullRomInterpolateAndDisplay(double t) {
 ///  to call with the glutDisplayFunc() function
 ///  during initialization
 static void display() {
-  
+
   glClear(GL_COLOR_BUFFER_BIT |
           GL_DEPTH_BUFFER_BIT); // clear framebuffer color&depth
 
@@ -1338,7 +1342,7 @@ static void initScene() {
   g_skyNode.reset(new SgRbtNode(RigTForm(Cvec3(0.0, 0.25, 14.0))));
 
   g_groundNode.reset(new SgRbtNode());
-  
+
   g_groundNode->addChild(shared_ptr<MyShapeNode>(
                            new MyShapeNode(g_ground, g_bumpFloorMat, Cvec3(0, g_groundY, 0))));
 
@@ -1347,7 +1351,7 @@ static void initScene() {
 
   g_light1Node.reset(new SgRbtNode(RigTForm(Cvec3(3.0, 2.5, 5))));
   g_light2Node.reset(new SgRbtNode(RigTForm(Cvec3(-3, 2.5, -3))));
-  
+
   // default selection and view
   g_currentPickedRbtNode = g_skyNode;
   g_currentView = g_skyNode;
