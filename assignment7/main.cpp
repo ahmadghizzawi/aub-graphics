@@ -33,6 +33,7 @@
 #include "headers/scenegraph.h"
 #include "headers/sgutils.h"
 #include "headers/geometry.h"
+#include "headers/mesh.h"
 using namespace std; // for string, vector, iostream, smart pointers, and other
                      // standard C++ stuff
 #include <fstream>
@@ -83,6 +84,7 @@ static shared_ptr<Material> g_redDiffuseMat,
                             g_bumpFloorMat,
                             g_arcballMat,
                             g_pickingMat,
+                            g_specularMat,
                             g_lightMat;
 
 shared_ptr<Material> g_overridingMaterial;
@@ -91,13 +93,14 @@ shared_ptr<Material> g_overridingMaterial;
 
 // Vertex buffer and index buffer associated with the ground and cube geometry
 static shared_ptr<Geometry> g_ground, g_arcball, g_cube;
+static shared_ptr<SimpleGeometryPN> g_simpleGeometryPN;
 
 typedef SgGeometryShapeNode MyShapeNode;
 
 // --------- Scene
 
 static shared_ptr<SgRootNode> g_world;
-static shared_ptr<SgRbtNode> g_skyNode, g_groundNode, g_robot1Node,
+static shared_ptr<SgRbtNode> g_skyNode, g_groundNode, g_robot1Node, g_cubeNode,
     g_robot2Node, g_light1Node, g_light2Node;
 // current picked object. Default is sky
 static shared_ptr<SgRbtNode> g_currentPickedRbtNode;
@@ -888,13 +891,53 @@ bool catmullRomInterpolateAndDisplay(double t) {
   }
 
   // copy the interpolated frame to scenegraph
-  copyKeyFrameToSceneGraph(interpolatedFrame);
+  copyKeyFrameToSceneGraph(interpolatedFrame); 
 
   // Redraw scene
   glutPostRedisplay();
 
   return c_plus2Index == (g_keyFrames.size() - 1);
 }
+// _____________________________________________________
+//|                                                     |
+//|  Meshes                                             |
+//|_____________________________________________________|
+///
+
+static void uploadCubeMeshToSimpleGeometry(){
+
+  Mesh mesh = Mesh();
+  mesh.load("cube.mesh");
+
+  cout << "Number of Faces " << mesh.getNumFaces() << '\n';
+
+  vector<VertexPN> vertices ;
+
+  //We need to break each face which is a square into 2 triangle
+  //looping thru all faces
+  for (int i = 0; i < mesh.getNumFaces(); i++)
+  {
+    //Getting a face
+    Mesh::Face face = mesh.getFace(i);
+
+    //we know that our faces are quads so they have 4 vertices
+    //We will split it into 2 traingle one with v0,v1,v2 and the other with v0,v2,v3
+    vertices.push_back(VertexPN(face.getVertex(0).getPosition() , face.getNormal()));
+    vertices.push_back(VertexPN(face.getVertex(1).getPosition() , face.getNormal()));
+    vertices.push_back(VertexPN(face.getVertex(2).getPosition() , face.getNormal()));
+
+    vertices.push_back(VertexPN(face.getVertex(0).getPosition() , face.getNormal()));
+    vertices.push_back(VertexPN(face.getVertex(2).getPosition() , face.getNormal()));
+    vertices.push_back(VertexPN(face.getVertex(3).getPosition() , face.getNormal()));
+   
+  }   
+ 
+  g_simpleGeometryPN.reset(new SimpleGeometryPN());
+  g_simpleGeometryPN->upload(&vertices[0], vertices.size());
+
+
+}
+
 
 // _____________________________________________________
 //|                                                     |
@@ -1226,6 +1269,7 @@ static void initMaterials() {
   // Create some prototype materials
   Material diffuse("./shaders/basic-gl3.vshader", "./shaders/diffuse-gl3.fshader");
   Material solid("./shaders/basic-gl3.vshader", "./shaders/solid-gl3.fshader");
+  Material specular("./shaders/basic-gl3.vshader", "./shaders/specular-gl3.fshader");
 
   // copy diffuse prototype and set red color
   g_redDiffuseMat.reset(new Material(diffuse));
@@ -1245,6 +1289,11 @@ static void initMaterials() {
   g_arcballMat->getUniforms().put("uColor", Cvec3f(0.27f, 0.82f, 0.35f));
   g_arcballMat->getRenderStates().polygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
+
+    // copy diffuse prototype and set red color
+  g_specularMat.reset(new Material(specular));
+  g_specularMat->getUniforms().put("uColor", Cvec3f(1, 1, 0));
+
   // copy solid prototype, and set to color white
   g_lightMat.reset(new Material(solid));
   g_lightMat->getUniforms().put("uColor", Cvec3f(1, 1, 0));
@@ -1257,6 +1306,7 @@ static void initGeometry() {
   initGround();
   initCubes();
   initArcball();
+  uploadCubeMeshToSimpleGeometry();
 }
 
 static void constructRobot(shared_ptr<SgTransformNode> base,
@@ -1346,11 +1396,18 @@ static void initScene() {
   g_groundNode->addChild(shared_ptr<MyShapeNode>(
                            new MyShapeNode(g_ground, g_bumpFloorMat, Cvec3(0, g_groundY, 0))));
 
+  g_cubeNode.reset(new SgRbtNode(RigTForm(Cvec3(-3, 1, 0))));
+
+  g_cubeNode->addChild(shared_ptr<MyShapeNode>(
+                           new MyShapeNode(g_simpleGeometryPN, g_specularMat, Cvec3(0.5, 0.5, 0.5), Cvec3(0.5, 0.5, 0.5), Cvec3(0.5, 0.5, 0.5))));
+
   g_robot1Node.reset(new SgRbtNode(RigTForm(Cvec3(-2, 1, 0))));
   g_robot2Node.reset(new SgRbtNode(RigTForm(Cvec3(2, 1, 0))));
 
   g_light1Node.reset(new SgRbtNode(RigTForm(Cvec3(3.0, 2.5, 5))));
   g_light2Node.reset(new SgRbtNode(RigTForm(Cvec3(-3, 2.5, -3))));
+
+
 
   // default selection and view
   g_currentPickedRbtNode = g_skyNode;
@@ -1394,6 +1451,8 @@ int main(int argc, char *argv[]) {
     initMaterials();
     initGeometry();
     initScene();
+   
+
     glutMainLoop();
     return 0;
   } catch (const runtime_error &e) {
