@@ -925,11 +925,9 @@ static void setMeshNormals(Mesh &mesh) {
 }
 
 static void scaleMeshVertices(Mesh &newMesh, Mesh &oldMesh, float t) {
-  int random = rand() % oldMesh.getNumVertices();
-
   for (int i = 0; i < oldMesh.getNumVertices(); i++) {
-    Cvec3 v = oldMesh.getVertex(i).getPosition();
-    newMesh.getVertex(i).setPosition(v + v * (sin(random + t / 100)));
+    Cvec3 oldPosition = oldMesh.getVertex(i).getPosition();
+    newMesh.getVertex(i).setPosition( oldPosition + oldPosition * sin(i + i*t/1000 ));
   }
 }
 
@@ -1285,7 +1283,7 @@ static void animateMeshTimerCallback(int ms) {
   animateSurface(t);
 
    glutTimerFunc(10, animateMeshTimerCallback,
-                 ms + 100);
+                 ms + 10);
 }
 
 // _____________________________________________________
