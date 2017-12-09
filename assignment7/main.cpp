@@ -95,6 +95,8 @@ shared_ptr<Material> g_overridingMaterial;
 static shared_ptr<Geometry> g_ground, g_arcball, g_cube;
 static shared_ptr<SimpleGeometryPN> g_simpleGeometryPN;
 
+static Mesh g_currentMesh, g_oldMesh;
+
 typedef SgGeometryShapeNode MyShapeNode;
 
 // --------- Scene
@@ -138,6 +140,7 @@ static const char SERIALIZATION_DELIMITER = ' ';
 ///
 
 static void animateTimerCallback(int ms);
+static void animateMeshTimerCallback(int ms);
 
 static void initGround() {
   int ibLen, vbLen;
@@ -921,16 +924,18 @@ static void setMeshNormals(Mesh &mesh) {
   }
 }
 
-static void uploadCubeMeshToSimpleGeometry(){
+static void scaleMeshVertices(Mesh &newMesh, Mesh &oldMesh, float t) {
+  int random = rand() % oldMesh.getNumVertices();
 
-  Mesh mesh = Mesh();
-  mesh.load("cube.mesh");
+  for (int i = 0; i < oldMesh.getNumVertices(); i++) {
+    Cvec3 v = oldMesh.getVertex(i).getPosition();
+    newMesh.getVertex(i).setPosition(v + v * (sin(random + t / 100)));
+  }
+}
 
-  cout << "Number of Faces " << mesh.getNumFaces() << '\n';
 
-  setMeshNormals(mesh);
-
-  vector<VertexPN> vertices ;
+static vector<VertexPN> getVertices(Mesh mesh) {
+  vector<VertexPN> vertices;
 
   //We need to break each face which is a square into 2 triangle
   //looping thru all faces
@@ -951,8 +956,34 @@ static void uploadCubeMeshToSimpleGeometry(){
 
   }
 
+  return vertices;
+}
+
+static void animateSurface(double t) {
+  scaleMeshVertices(g_currentMesh, g_oldMesh, t);
+  setMeshNormals(g_currentMesh);
+
+  vector<VertexPN> vertices = getVertices(g_currentMesh);
+  g_simpleGeometryPN->upload(&vertices[0], vertices.size());
+
+  glutPostRedisplay();
+}
+
+static void uploadCubeMeshToSimpleGeometry(){
+
+  g_oldMesh = Mesh();
+  g_oldMesh.load("cube.mesh");
+
+  setMeshNormals(g_oldMesh);
+
+  g_currentMesh = Mesh(g_oldMesh);
+
+  vector<VertexPN> vertices = getVertices(g_currentMesh);
+
   g_simpleGeometryPN.reset(new SimpleGeometryPN());
   g_simpleGeometryPN->upload(&vertices[0], vertices.size());
+
+  animateMeshTimerCallback(0);
 }
 
 
@@ -1249,20 +1280,12 @@ static void animateTimerCallback(int ms) {
 
 static void animateMeshTimerCallback(int ms) {
 
-  double t = (double)ms / (double)g_msBetweenKeyFrames;
+  double t = (double)ms;
 
-  // toggle between standard animation (g_animationType=0) and catmull-rom
-  // splines (g_animationType=1).
-  bool endReached = g_animationType == 0 ? interpolateAndDisplay(t)
-                                         : catmullRomInterpolateAndDisplay(t);
+  animateSurface(t);
 
-  if (!endReached && g_animationRunning) {
-    glutTimerFunc(1000 / g_animateFramesPerSecond, animateTimerCallback,
-                  ms + 1000 / g_animateFramesPerSecond);
-  } else {
-    g_animationRunning = false;
-    cout << "Animation sequence has ended." << '\n';
-  }
+   glutTimerFunc(10, animateMeshTimerCallback,
+                 ms + 100);
 }
 
 // _____________________________________________________
