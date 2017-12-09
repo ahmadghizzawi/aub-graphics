@@ -906,6 +906,9 @@ bool catmullRomInterpolateAndDisplay(double t) {
 //|  Meshes                                             |
 //|_____________________________________________________|
 ///
+
+// Takes in a mesh and sets the normal of the vertices to the sum of all
+// faces incident to the vertex in the mesh
 static void setMeshNormals(Mesh &mesh) {
   for (int i = 0; i < mesh.getNumVertices(); i++) {
     mesh.getVertex(i).setNormal(Cvec3());
@@ -924,10 +927,12 @@ static void setMeshNormals(Mesh &mesh) {
   }
 }
 
+// Takes in the old, and new meshes along with the times and scales the position of the new vertices
+// according to the formula (oldPosition + oldPosition * sin(i + i*t/1000)
 static void scaleMeshVertices(Mesh &newMesh, Mesh &oldMesh, float t) {
   for (int i = 0; i < oldMesh.getNumVertices(); i++) {
     Cvec3 oldPosition = oldMesh.getVertex(i).getPosition();
-    newMesh.getVertex(i).setPosition( oldPosition + oldPosition * sin(i + i*t/1000 ));
+    newMesh.getVertex(i).setPosition( oldPosition + oldPosition * sin(i + i * t/1000));
   }
 }
 
@@ -957,6 +962,10 @@ static vector<VertexPN> getVertices(Mesh mesh) {
   return vertices;
 }
 
+// Animates the mesh surface by doing the following:
+// - scale the vertices based on the passed t
+// - set the vertices normals of the mesh
+// - dump the new vertices into the geometry object
 static void animateSurface(double t) {
   scaleMeshVertices(g_currentMesh, g_oldMesh, t);
   setMeshNormals(g_currentMesh);
@@ -967,7 +976,9 @@ static void animateSurface(double t) {
   glutPostRedisplay();
 }
 
-static void uploadCubeMeshToSimpleGeometry(){
+// Initalizes the old and new meshes and dumps the initial mesh into the geometry.
+// Starts the animation sequence
+static void initSimpleGeometryMesh(){
 
   g_oldMesh = Mesh();
   g_oldMesh.load("cube.mesh");
@@ -1369,7 +1380,7 @@ static void initGeometry() {
   initGround();
   initCubes();
   initArcball();
-  uploadCubeMeshToSimpleGeometry();
+  initSimpleGeometryMesh();
 }
 
 static void constructRobot(shared_ptr<SgTransformNode> base,
