@@ -96,7 +96,7 @@ static vector<shared_ptr<Material> > g_bunnyShellMats; // for bunny shells
 
 // --------- Geometry
 
-static const int g_numShells = 24; // constants defining how many layers of shells
+static const int g_numShells = 32; // constants defining how many layers of shells
 static double g_furHeight = 0.21;
 static double g_hairyness = 0.7;
 
@@ -946,16 +946,15 @@ static void setMeshNormals(Mesh &mesh) {
     mesh.getVertex(i).setNormal(Cvec3());
   }
 
-  for (int i = 0; i < mesh.getNumVertices(); i++) {
+  for (int i = 0; i < mesh.getNumFaces(); i++) {
     Cvec3 sum = Cvec3();
-    Mesh::Vertex v = mesh.getVertex(i);
+    Mesh::Face face = mesh.getFace(i);
+    Cvec3 faceNormal = face.getNormal();
 
-    Mesh::VertexIterator it(v.getIterator()), it0(it);
-    do {
-      sum += it.getFace().getNormal();
-    } while (++it != it0);
-
-    v.setNormal(sum);
+    for (int j = 0; j < face.getNumVertices(); j++) {
+        Mesh::Vertex v = mesh.getVertex(j);
+        v.setNormal( v.getNormal() + faceNormal);
+    }
   }
 }
 
@@ -985,10 +984,35 @@ static vector<VertexPN> getVertices(Mesh mesh) {
     vertices.push_back(VertexPN(face.getVertex(1).getPosition() , face.getVertex(1).getNormal()));
     vertices.push_back(VertexPN(face.getVertex(2).getPosition() , face.getVertex(2).getNormal()));
 
+    
     vertices.push_back(VertexPN(face.getVertex(0).getPosition() , face.getVertex(0).getNormal()));
     vertices.push_back(VertexPN(face.getVertex(2).getPosition() , face.getVertex(2).getNormal()));
     vertices.push_back(VertexPN(face.getVertex(3).getPosition() , face.getVertex(3).getNormal()));
 
+  }
+
+  return vertices;
+}
+
+static vector<VertexPN> getBunnyVertices(Mesh mesh) {
+  vector<VertexPN> vertices;
+
+  //We need to break each face which is a square into 2 triangle
+  //looping thru all faces
+  for (int i = 0; i < mesh.getNumFaces(); i++)
+  {
+    //Getting a face
+    Mesh::Face face = mesh.getFace(i);
+   
+    // Creating n - 2 triangles from a polygon
+    for (int j = 1; j < face.getNumVertices() - 1; j++)
+      {
+          vertices.push_back(VertexPN(face.getVertex(0).getPosition() , face.getVertex(0).getNormal()));
+          vertices.push_back(VertexPN(face.getVertex(j).getPosition() , face.getVertex(j).getNormal()));
+          vertices.push_back(VertexPN(face.getVertex(j+1).getPosition() , face.getVertex(j+1).getNormal()));
+      }
+
+   
   }
 
   return vertices;
@@ -1507,11 +1531,19 @@ static void initMaterials() {
 };
 
 static void initBunnyMeshes() {
+
+  cout << "Started loading bunny: "  << endl;
   g_bunnyMesh.load("bunny.mesh");
+   cout << "Ended loading bunny: "  << endl;
+ 
 
   setMeshNormals(g_bunnyMesh); 
 
-  vector<VertexPN> vertices = getVertices(g_bunnyMesh);
+  cout << "initBunnyMeshes normals finsihed "  << endl;
+
+  vector<VertexPN> vertices = getBunnyVertices(g_bunnyMesh);
+
+  cout << "getBunnyVertices vertices finsihed "  << endl;
 
   g_bunnyGeometry.reset(new SimpleGeometryPN());
   g_bunnyGeometry->upload(&vertices[0], vertices.size());
@@ -1522,6 +1554,8 @@ static void initBunnyMeshes() {
   for (int i = 0; i < g_numShells; ++i) {
     g_bunnyShellGeometries[i].reset(new SimpleGeometryPNX());
   }
+
+   cout << "initBunnyMeshes finsihed "  << endl;
 }
 
 static void initGeometry() {
@@ -1693,7 +1727,7 @@ int main(int argc, char *argv[]) {
     initMaterials();
     initGeometry();
     initScene();
-    initSimulation();
+    //initSimulation();
 
     glutMainLoop();
     return 0;
