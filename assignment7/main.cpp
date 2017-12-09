@@ -891,7 +891,7 @@ bool catmullRomInterpolateAndDisplay(double t) {
   }
 
   // copy the interpolated frame to scenegraph
-  copyKeyFrameToSceneGraph(interpolatedFrame); 
+  copyKeyFrameToSceneGraph(interpolatedFrame);
 
   // Redraw scene
   glutPostRedisplay();
@@ -903,6 +903,23 @@ bool catmullRomInterpolateAndDisplay(double t) {
 //|  Meshes                                             |
 //|_____________________________________________________|
 ///
+static void setMeshNormals(Mesh &mesh) {
+  for (int i = 0; i < mesh.getNumVertices(); i++) {
+    mesh.getVertex(i).setNormal(Cvec3());
+  }
+
+  for (int i = 0; i < mesh.getNumVertices(); i++) {
+    Cvec3 sum = Cvec3();
+    Mesh::Vertex v = mesh.getVertex(i);
+
+    Mesh::VertexIterator it(v.getIterator()), it0(it);
+    do {
+      sum += it.getFace().getNormal();
+    } while (++it != it0);
+
+    v.setNormal(sum);
+  }
+}
 
 static void uploadCubeMeshToSimpleGeometry(){
 
@@ -910,6 +927,8 @@ static void uploadCubeMeshToSimpleGeometry(){
   mesh.load("cube.mesh");
 
   cout << "Number of Faces " << mesh.getNumFaces() << '\n';
+
+  setMeshNormals(mesh);
 
   vector<VertexPN> vertices ;
 
@@ -922,20 +941,18 @@ static void uploadCubeMeshToSimpleGeometry(){
 
     //we know that our faces are quads so they have 4 vertices
     //We will split it into 2 traingle one with v0,v1,v2 and the other with v0,v2,v3
-    vertices.push_back(VertexPN(face.getVertex(0).getPosition() , face.getNormal()));
-    vertices.push_back(VertexPN(face.getVertex(1).getPosition() , face.getNormal()));
-    vertices.push_back(VertexPN(face.getVertex(2).getPosition() , face.getNormal()));
+    vertices.push_back(VertexPN(face.getVertex(0).getPosition() , face.getVertex(0).getNormal()));
+    vertices.push_back(VertexPN(face.getVertex(1).getPosition() , face.getVertex(1).getNormal()));
+    vertices.push_back(VertexPN(face.getVertex(2).getPosition() , face.getVertex(2).getNormal()));
 
-    vertices.push_back(VertexPN(face.getVertex(0).getPosition() , face.getNormal()));
-    vertices.push_back(VertexPN(face.getVertex(2).getPosition() , face.getNormal()));
-    vertices.push_back(VertexPN(face.getVertex(3).getPosition() , face.getNormal()));
-   
-  }   
- 
+    vertices.push_back(VertexPN(face.getVertex(0).getPosition() , face.getVertex(0).getNormal()));
+    vertices.push_back(VertexPN(face.getVertex(2).getPosition() , face.getVertex(2).getNormal()));
+    vertices.push_back(VertexPN(face.getVertex(3).getPosition() , face.getVertex(3).getNormal()));
+
+  }
+
   g_simpleGeometryPN.reset(new SimpleGeometryPN());
   g_simpleGeometryPN->upload(&vertices[0], vertices.size());
-
-
 }
 
 
@@ -1225,6 +1242,31 @@ static void animateTimerCallback(int ms) {
 
 // _____________________________________________________
 //|                                                     |
+//|  animateMeshTimerCallback                               |
+//|_____________________________________________________|
+///
+/// animates the vertices of the mesh
+
+static void animateMeshTimerCallback(int ms) {
+
+  double t = (double)ms / (double)g_msBetweenKeyFrames;
+
+  // toggle between standard animation (g_animationType=0) and catmull-rom
+  // splines (g_animationType=1).
+  bool endReached = g_animationType == 0 ? interpolateAndDisplay(t)
+                                         : catmullRomInterpolateAndDisplay(t);
+
+  if (!endReached && g_animationRunning) {
+    glutTimerFunc(1000 / g_animateFramesPerSecond, animateTimerCallback,
+                  ms + 1000 / g_animateFramesPerSecond);
+  } else {
+    g_animationRunning = false;
+    cout << "Animation sequence has ended." << '\n';
+  }
+}
+
+// _____________________________________________________
+//|                                                     |
 //|  Helper Functions                                   |
 //|_____________________________________________________|
 ///
@@ -1292,7 +1334,7 @@ static void initMaterials() {
 
     // copy diffuse prototype and set red color
   g_specularMat.reset(new Material(specular));
-  g_specularMat->getUniforms().put("uColor", Cvec3f(1, 1, 0));
+  g_specularMat->getUniforms().put("uColor", Cvec3f(1, 0, 1));
 
   // copy solid prototype, and set to color white
   g_lightMat.reset(new Material(solid));
@@ -1396,10 +1438,10 @@ static void initScene() {
   g_groundNode->addChild(shared_ptr<MyShapeNode>(
                            new MyShapeNode(g_ground, g_bumpFloorMat, Cvec3(0, g_groundY, 0))));
 
-  g_cubeNode.reset(new SgRbtNode(RigTForm(Cvec3(-3, 1, 0))));
+  g_cubeNode.reset(new SgRbtNode(RigTForm()));
 
   g_cubeNode->addChild(shared_ptr<MyShapeNode>(
-                           new MyShapeNode(g_simpleGeometryPN, g_specularMat, Cvec3(0.5, 0.5, 0.5), Cvec3(0.5, 0.5, 0.5), Cvec3(0.5, 0.5, 0.5))));
+                           new MyShapeNode(g_simpleGeometryPN, g_specularMat, Cvec3(0.0, 0.0, 0.0))));
 
   g_robot1Node.reset(new SgRbtNode(RigTForm(Cvec3(-2, 1, 0))));
   g_robot2Node.reset(new SgRbtNode(RigTForm(Cvec3(2, 1, 0))));
@@ -1422,6 +1464,7 @@ static void initScene() {
   g_world->addChild(g_robot2Node);
   g_world->addChild(g_light1Node);
   g_world->addChild(g_light2Node);
+  g_world->addChild(g_cubeNode);
 
   // attach spheres to light nodes to make them pickable
   shared_ptr<SgGeometryShapeNode> shape(
@@ -1451,7 +1494,7 @@ int main(int argc, char *argv[]) {
     initMaterials();
     initGeometry();
     initScene();
-   
+
 
     glutMainLoop();
     return 0;
