@@ -85,11 +85,24 @@ static shared_ptr<Material> g_redDiffuseMat,
                             g_arcballMat,
                             g_pickingMat,
                             g_specularMat,
-                            g_lightMat;
+                            g_lightMat,
+                            g_bunnyMat;
 
 shared_ptr<Material> g_overridingMaterial;
 
+
+static vector<shared_ptr<Material> > g_bunnyShellMats; // for bunny shells
+
+
 // --------- Geometry
+
+static const int g_numShells = 24; // constants defining how many layers of shells
+static double g_furHeight = 0.21;
+static double g_hairyness = 0.7;
+
+static shared_ptr<SimpleGeometryPN> g_bunnyGeometry;
+static vector<shared_ptr<SimpleGeometryPNX> > g_bunnyShellGeometries;
+static Mesh g_bunnyMesh;
 
 // Vertex buffer and index buffer associated with the ground and cube geometry
 static shared_ptr<Geometry> g_ground, g_arcball, g_cube;
@@ -102,6 +115,10 @@ typedef SgGeometryShapeNode MyShapeNode;
 // --------- Scene
 
 static shared_ptr<SgRootNode> g_world;
+
+static shared_ptr<SgRbtNode> g_bunnyNode;
+
+
 static shared_ptr<SgRbtNode> g_skyNode, g_groundNode, g_robot1Node, g_cubeNode,
     g_robot2Node, g_light1Node, g_light2Node;
 // current picked object. Default is sky
@@ -132,6 +149,21 @@ static int g_animationType = 1; // 0 is standard lerp/slerp. 1 is catmull-rom.
 
 static const string keyFramesFileName = "key.frames";
 static const char SERIALIZATION_DELIMITER = ' ';
+
+
+//Physics Simulations
+
+// Global variables for used physical simulation
+static const Cvec3 g_gravity(0, -0.5, 0);  // gavity vector
+static double g_timeStep = 0.02;
+static double g_numStepsPerFrame = 10;
+static double g_damping = 0.96;
+static double g_stiffness = 4;
+static int g_simulationsPerSecond = 60;
+
+static std::vector<Cvec3> g_tipPos,        // should be hair tip pos in world-space coordinates
+                          g_tipVelocity;   // should be hair tip velocity in world-space coordinates
+
 
 // _____________________________________________________
 //|                                                     |
@@ -995,6 +1027,42 @@ static void initSimpleGeometryMesh(){
   animateMeshTimerCallback(0);
 }
 
+// _____________________________________________________
+//|                                                     |
+//|  Physics                                            |
+//|_____________________________________________________|
+///
+
+// Specifying shell geometries based on g_tipPos, g_furHeight, and g_numShells.
+// You need to call this function whenver the shell needs to be updated
+static void updateShellGeometry() {
+  // TASK 1 and 3 TODO: finish this function as part of Task 1 and Task 3
+}
+
+// New glut timer call back that perform dynamics simulation
+// every g_simulationsPerSecond times per second
+static void hairsSimulationCallback(int dontCare) {
+
+  // TASK 2 TODO: wrte dynamics simulation code here as part of TASK2
+
+  
+  // schedule this to get called again
+  glutTimerFunc(1000/g_simulationsPerSecond, hairsSimulationCallback, 0);
+  glutPostRedisplay(); // signal redisplaying
+}
+
+// New function that initialize the dynamics simulation
+static void initSimulation() {
+  g_tipPos.resize(g_bunnyMesh.getNumVertices(), Cvec3(0));
+  g_tipVelocity = g_tipPos;
+
+  // TASK 1 TODO: initialize g_tipPos to "at-rest" hair tips in world coordinates
+
+ 
+  // Starts hair tip simulation
+  hairsSimulationCallback(0);
+}
+
 
 // _____________________________________________________
 //|                                                     |
@@ -1156,6 +1224,30 @@ static void keyboardUp(const unsigned char key, const int x, const int y) {
   switch (key) {
   case ' ':
     g_spaceDown = false;
+    break;
+  }
+  glutPostRedisplay();
+}
+
+
+// new  special keyboard callback, for arrow keys
+static void specialKeyboard(const int key, const int x, const int y) {
+  switch (key) {
+  case GLUT_KEY_RIGHT:
+    g_furHeight *= 1.05;
+    cerr << "fur height = " << g_furHeight << std::endl;
+    break;
+  case GLUT_KEY_LEFT:
+    g_furHeight /= 1.05;
+    std::cerr << "fur height = " << g_furHeight << std::endl;
+    break;
+  case GLUT_KEY_UP:
+    g_hairyness *= 1.05;
+    cerr << "hairyness = " << g_hairyness << std::endl;
+    break;
+  case GLUT_KEY_DOWN:
+    g_hairyness /= 1.05;
+    cerr << "hairyness = " << g_hairyness << std::endl;
     break;
   }
   glutPostRedisplay();
@@ -1324,6 +1416,7 @@ static void initGlutState(int argc, char *argv[]) {
   glutMouseFunc(mouse);     // mouse click callback
   glutKeyboardFunc(keyboard);
   glutKeyboardUpFunc(keyboardUp);
+  glutSpecialFunc(specialKeyboard);                       // special keyboard callback
 }
 
 static void initGLState() {
@@ -1374,13 +1467,69 @@ static void initMaterials() {
 
   // pick shader
   g_pickingMat.reset(new Material("./shaders/basic-gl3.vshader", "./shaders/pick-gl3.fshader"));
+
+
+
+
+  // bunny material
+  g_bunnyMat.reset(new Material("./shaders/basic-gl3.vshader", "./shaders/bunny-gl3.fshader"));
+  g_bunnyMat->getUniforms()
+  .put("uColorAmbient", Cvec3f(0.45f, 0.3f, 0.3f))
+  .put("uColorDiffuse", Cvec3f(0.2f, 0.2f, 0.2f));
+
+  // bunny shell materials;
+  shared_ptr<ImageTexture> shellTexture(new ImageTexture("shell.ppm", false)); // common shell texture
+
+  // needs to enable repeating of texture coordinates
+  shellTexture->bind();
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+  // eachy layer of the shell uses a different material, though the materials will share the
+  // same shader files and some common uniforms. hence we create a prototype here, and will
+  // copy from the prototype later
+  Material bunnyShellMatPrototype("./shaders/bunny-shell-gl3.vshader", "./shaders/bunny-shell-gl3.fshader");
+  shared_ptr<Texture> text = dynamic_pointer_cast<Texture>(shellTexture);
+  bunnyShellMatPrototype.getUniforms().put("uTexShell", text);
+  bunnyShellMatPrototype.getRenderStates()
+  .blendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA) // set blending mode
+  .enable(GL_BLEND) // enable blending
+  .disable(GL_CULL_FACE); // disable culling
+
+  // allocate array of materials
+  g_bunnyShellMats.resize(g_numShells);
+  for (int i = 0; i < g_numShells; ++i) {
+    g_bunnyShellMats[i].reset(new Material(bunnyShellMatPrototype)); // copy from the prototype
+    // but set a different exponent for blending transparency
+    g_bunnyShellMats[i]->getUniforms().put("uAlphaExponent", 2.f + 5.f * float(i + 1)/g_numShells);
+  }
 };
+
+static void initBunnyMeshes() {
+  g_bunnyMesh.load("bunny.mesh");
+
+  setMeshNormals(g_bunnyMesh); 
+
+  vector<VertexPN> vertices = getVertices(g_bunnyMesh);
+
+  g_bunnyGeometry.reset(new SimpleGeometryPN());
+  g_bunnyGeometry->upload(&vertices[0], vertices.size());
+
+
+  // Now allocate array of SimpleGeometryPNX to for shells, one per layer
+  g_bunnyShellGeometries.resize(g_numShells);
+  for (int i = 0; i < g_numShells; ++i) {
+    g_bunnyShellGeometries[i].reset(new SimpleGeometryPNX());
+  }
+}
 
 static void initGeometry() {
   initGround();
   initCubes();
   initArcball();
   initSimpleGeometryMesh();
+  initBunnyMeshes();
 }
 
 static void constructRobot(shared_ptr<SgTransformNode> base,
@@ -1473,13 +1622,29 @@ static void initScene() {
   g_cubeNode.reset(new SgRbtNode(RigTForm()));
 
   g_cubeNode->addChild(shared_ptr<MyShapeNode>(
-                           new MyShapeNode(g_simpleGeometryPN, g_specularMat, Cvec3(0.0, 0.0, 0.0))));
+                           new MyShapeNode(g_simpleGeometryPN, g_specularMat, Cvec3(-2.9, 0.0, 0.0))));
 
   g_robot1Node.reset(new SgRbtNode(RigTForm(Cvec3(-2, 1, 0))));
   g_robot2Node.reset(new SgRbtNode(RigTForm(Cvec3(2, 1, 0))));
 
   g_light1Node.reset(new SgRbtNode(RigTForm(Cvec3(3.0, 2.5, 5))));
   g_light2Node.reset(new SgRbtNode(RigTForm(Cvec3(-3, 2.5, -3))));
+
+
+ // create a single transform node for both the bunny and the bunny shells
+  g_bunnyNode.reset(new SgRbtNode());
+
+  // add bunny as a shape nodes
+  g_bunnyNode->addChild(shared_ptr<MyShapeNode>(
+                          new MyShapeNode(g_bunnyGeometry, g_bunnyMat)));
+
+  // add each shell as shape node
+  for (int i = 0; i < g_numShells; ++i) {
+    g_bunnyNode->addChild(shared_ptr<MyShapeNode>(
+                            new MyShapeNode(g_bunnyShellGeometries[i], g_bunnyShellMats[i])));
+  }
+  // from this point, calling g_bunnyShellGeometries[i]->reset(...) will change the
+  // geometry of the ith layer of shell that gets drawn
 
 
 
@@ -1497,6 +1662,8 @@ static void initScene() {
   g_world->addChild(g_light1Node);
   g_world->addChild(g_light2Node);
   g_world->addChild(g_cubeNode);
+
+  g_world->addChild(g_bunnyNode);
 
   // attach spheres to light nodes to make them pickable
   shared_ptr<SgGeometryShapeNode> shape(
@@ -1526,7 +1693,7 @@ int main(int argc, char *argv[]) {
     initMaterials();
     initGeometry();
     initScene();
-
+    initSimulation();
 
     glutMainLoop();
     return 0;
