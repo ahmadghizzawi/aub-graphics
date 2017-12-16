@@ -51,6 +51,11 @@ public:
     return getRotation() * a + Cvec4(getTranslation(), 0);
   }
 
+   Cvec3 operator*(const Cvec3& a) const {
+    return Cvec3(operator*(Cvec4(a, 1)));
+  }
+
+
   // The product of two RigTForm
   // Returns
   // [i t1+r1t2] * [r1r2 0]
