@@ -92,17 +92,18 @@ shared_ptr<Material> g_overridingMaterial;
 
 
 static vector<shared_ptr<Material> > g_bunnyShellMats; // for bunny shells
-
+ 
 
 // --------- Geometry
 
 static const int g_numShells = 24; // constants defining how many layers of shells
-static double g_furHeight = 0.0021;
+static double g_furHeight = 0.21;
 static double g_hairyness = 0.7;
 
 static shared_ptr<SimpleGeometryPN> g_bunnyGeometry;
 static vector<shared_ptr<SimpleGeometryPNX> > g_bunnyShellGeometries;
 static Mesh g_bunnyMesh;
+static bool g_ShellNeedsUpdate = true;
 
 // Vertex buffer and index buffer associated with the ground and cube geometry
 static shared_ptr<Geometry> g_ground, g_arcball, g_cube;
@@ -173,7 +174,7 @@ static std::vector<Cvec3> g_tipPos,        // should be hair tip pos in world-sp
 
 static void animateTimerCallback(int ms);
 static void animateMeshTimerCallback(int ms);
-static void  updateBunnyShellsGeometry();
+static void  updateShellGeometry();
 
 
 static void initGround() {
@@ -373,9 +374,11 @@ static void drawStuff(bool picking) {
   uniforms.put("uLight", eyeLight1);
   uniforms.put("uLight2", eyeLight2);
 
-
- updateBunnyShellsGeometry();
-  
+  //to avoid unneccesary calls to updateShellGeomtry which is quite expensive
+  if(g_ShellNeedsUpdate){
+    updateShellGeometry();
+  }
+   
   // draw robots, and ground
   // ==========
   //
@@ -951,22 +954,38 @@ bool catmullRomInterpolateAndDisplay(double t) {
 
 // Takes in a mesh and sets the normal of the vertices to the sum of all
 // faces incident to the vertex in the mesh
-static void setMeshNormals(Mesh &mesh) {
-  for (int i = 0; i < mesh.getNumVertices(); i++) {
-    mesh.getVertex(i).setNormal(Cvec3());
+static void setMeshNormals(Mesh &bunny) {
+
+  //Zero out all of the vertex normals
+  for (int i = 0; i < bunny.getNumVertices(); i++) {
+    bunny.getVertex(i).setNormal(Cvec3());
   }
 
-  for (int i = 0; i < mesh.getNumFaces(); i++) {
-    Cvec3 sum = Cvec3();
-    Mesh::Face face = mesh.getFace(i);
-    Cvec3 faceNormal = face.getNormal();
+  //iterate through the faces of the mesh and  accumulate its normal to all its surrounding vertices
+  for (int i = 0; i < bunny.getNumFaces(); i++) {
+    
+    Mesh::Face meshFace = bunny.getFace(i);
+    const Cvec3 meshFaceNormal = meshFace.getNormal();
 
-    for (int j = 0; j < face.getNumVertices(); j++) {
-        Mesh::Vertex v = mesh.getVertex(j);
-        v.setNormal( v.getNormal() + faceNormal);
+    for (int j = 0; j < meshFace.getNumVertices(); j++) {
+        Mesh::Vertex v = meshFace.getVertex(j);
+        v.setNormal( v.getNormal() + meshFaceNormal);
     }
+
+    //assumed valency is 2 : TODO calculate the number of edges on this vertx
+     for (int j = 0; j < meshFace.getNumVertices(); j++) {
+        Mesh::Vertex v = meshFace.getVertex(j);
+        Cvec3 vNormal = v.getNormal() ;
+        v.setNormal(v.getNormal() / 2);
+        
+        
+     }
+
   }
+
+
 }
+
 
 // Takes in the old, and new meshes along with the times and scales the position of the new vertices
 // according to the formula (oldPosition + oldPosition * sin(i + i*t/1000)
@@ -1067,94 +1086,88 @@ static void initSimpleGeometryMesh(){
 //|_____________________________________________________|
 ///
 
-static vector<vector<Cvec3> > g_ShellVertexCache;
-
-
-
-static VertexPNX getHairVertex(Mesh::Vertex vertex, int shellLayer, Cvec2 texVec, RigTForm invBunnyRbt) {
-
-  //cout<< "In getHairVertex" << endl;
-
-  /* values used for hair curving */
-  const Cvec3 p = vertex.getPosition();
-  const Cvec3 n = vertex.getNormal() * (g_furHeight / g_numShells);
-  //cout<< "In getHairVertex  01" << endl;
-  const Cvec3 t = invBunnyRbt * g_tipPos[vertex.getIndex()];
-  //cout<< "In getHairVertex 02" << endl;
-
-  const Cvec3 d = ((t - p - n * g_numShells) / (g_numShells * g_numShells - g_numShells)) * 2;
-
-  //cout<< "In getHairVertex 1" << endl;
-
-  /* If we're on the first shell, our previous vertex is just the one on the
-   * surface of the mesh. Otherwise, it's the previously computed vertex. */
-  const Cvec3 point = (shellLayer == 0) ? vertex.getPosition() : g_ShellVertexCache[vertex.getIndex()][shellLayer - 1];
-
-  //cout<< "In getHairVertex 2" << endl;
-
-  /* compute the current vertex's position and cache it */
-  g_ShellVertexCache[vertex.getIndex()][shellLayer] = point + n + d * shellLayer;
-
-  //cout<< "In getHairVertex 3" << endl;
-  /* choose a normal that makes the fur shiny */
-  const Cvec3 normal = (shellLayer == 0) ? 
-                    vertex.getNormal() : g_ShellVertexCache[vertex.getIndex()][shellLayer] - 
-                                                  g_ShellVertexCache[vertex.getIndex()][shellLayer - 1];
-
-  //cout<< "Out getHairVertex" << endl;
-  return VertexPNX(g_ShellVertexCache[vertex.getIndex()][shellLayer], normal, texVec);
-}
-
-
-/**
- * Returns the vertices for the layer-th layer of the bunny shell.
- */
-static vector<VertexPNX> getAllVerticesForShellLayer( Mesh &mesh, int shellLayer, RigTForm invBunnyRbt) {
- //cout<< "In getAllVerticesForShellLayer" << endl;
-  /* initialize the shell vertex cache to the proper size */
-  g_ShellVertexCache.resize(mesh.getNumVertices());
-  for (int i = 0; i < mesh.getNumVertices(); i++) {
-    g_ShellVertexCache[i].resize(g_numShells);
-  }
-  vector<VertexPNX> vs;
-  /* For each face: */
-  for (int i = 0; i < mesh.getNumFaces(); i++) {
-    Mesh::Face f = mesh.getFace(i);
-    /* For each vertex of each face: */
-    for (int j = 1; j < f.getNumVertices() - 1; j++) {
-      vs.push_back(getHairVertex(f.getVertex( 0), shellLayer, Cvec2(0, 0), invBunnyRbt));
-      vs.push_back(getHairVertex(f.getVertex(j), shellLayer, Cvec2(g_hairyness, 0), invBunnyRbt));
-      vs.push_back(getHairVertex(f.getVertex(j+1), shellLayer, Cvec2(0, g_hairyness), invBunnyRbt));
-    }
-  }
- //cout<< "Out getAllVerticesForShellLayer" << endl;
-  return vs;
-}
-
+//g_calculatedShellVertices a data structure to hold previously calculated vertices of the hairs
+static  vector<Cvec3>   g_calculatedShellVertices[g_numShells] ;
 
 // Specifying shell geometries based on g_tipPos, g_furHeight, and g_numShells.
+//bunnyRigTForm is expressed in world coordinates
+static VertexPNX singleHairVertex(Mesh::Vertex vertex, int shellLayer, Cvec2 texVec, RigTForm bunnyObjectRBT ) {
+  const Cvec3 p = vertex.getPosition();
+  const Cvec3 n = vertex.getNormal() * (g_furHeight / g_numShells)   ; 
+  //In world coordinates
+  const Cvec3 t = bunnyObjectRBT * g_tipPos[vertex.getIndex()];   
+  //d is a vector estimated by us to have this value
+  const Cvec3 d =  ((t - p - n * 10 ) / 1000) * 2 ;  
+  
+  if(shellLayer == 0){
+    const Cvec3 point = vertex.getPosition();
+    Cvec3 calculatedVertex = point + n + d * shellLayer;
+    g_calculatedShellVertices[shellLayer][vertex.getIndex()] =  calculatedVertex; 
+    return VertexPNX(calculatedVertex , vertex.getNormal(), texVec);
+  }
+  else{
+    const Cvec3 point = g_calculatedShellVertices[shellLayer - 1][vertex.getIndex()];
+    Cvec3 calculatedVertex = point + n + d * shellLayer;
+    g_calculatedShellVertices[shellLayer][vertex.getIndex()] =  calculatedVertex; 
+    const Cvec3 normal = calculatedVertex  - g_calculatedShellVertices[shellLayer - 1][vertex.getIndex()];    
+    return VertexPNX(calculatedVertex , normal, texVec);
+  }
+     
+}
 // You need to call this function whenver the shell needs to be updated
-static void updateBunnyShellsGeometry() {
-  // TASK 1 and 3 TODO: finish this function as part of Task 1 and Task 3
+static void updateShellGeometry() {
+  //we need to initialize each layer of g_calculatedShellVertices with the number of vertices in the bunny mesh
+  for (int i = 0; i < g_numShells; i++) {
+   g_calculatedShellVertices[i].resize(g_bunnyMesh.getNumVertices());
+  } 
+  //In order to do our calculations in world coordinates
+  RigTForm bunnyObject =  inv(getPathAccumRbt(g_world, g_bunnyNode)); 
+  //On each shell we need to specify all the vertices hairs of this layer
+  for (int i = 0; i < g_numShells; i++) {
 
-  RigTForm invBunnyRbt = inv(getPathAccumRbt(g_world, g_bunnyNode));
-  for (int i = 0; i < g_numShells; ++i) {
-    vector<VertexPNX> verticies =  getAllVerticesForShellLayer(g_bunnyMesh,i, invBunnyRbt);
-    //cout<< verticies.size() << endl;
-    g_bunnyShellGeometries[i]->upload(&verticies[0], verticies.size());
-    
+      //all triangles in a shell
+      vector<VertexPNX> allTrianglesVertices;     
+      //for each face 
+      for (int j = 0; j < g_bunnyMesh.getNumFaces(); j++) {
+        Mesh::Face f = g_bunnyMesh.getFace(j);        
+        //for each triangle
+        allTrianglesVertices.push_back(singleHairVertex(f.getVertex(0), i, Cvec2(0, 0), bunnyObject));
+        allTrianglesVertices.push_back(singleHairVertex(f.getVertex(1), i, Cvec2(g_hairyness, 0), bunnyObject));
+        allTrianglesVertices.push_back(singleHairVertex(f.getVertex(2), i, Cvec2(0, g_hairyness), bunnyObject));      
+      }         
+      g_bunnyShellGeometries[i]->upload(&allTrianglesVertices[0], allTrianglesVertices.size());    
+  }
+
+  g_ShellNeedsUpdate = false;   
+
 }
 
-
-}
 
 // New glut timer call back that perform dynamics simulation
 // every g_simulationsPerSecond times per second
 static void hairsSimulationCallback(int dontCare) {
+  g_ShellNeedsUpdate = true;
 
-  // TASK 2 TODO: wrte dynamics simulation code here as part of TASK2
-
+  RigTForm rbt = getPathAccumRbt(g_world, g_bunnyNode);
   
+  for (int i = 0; i < g_numStepsPerFrame; i++) {
+    for (int j = 0; j < g_bunnyMesh.getNumVertices(); j++) {
+      Mesh::Vertex vertex = g_bunnyMesh.getVertex(j);    
+      int index = vertex.getIndex();  
+      Cvec3 p = rbt * vertex.getPosition();
+      Cvec3 s = rbt * vertex.getPosition() + vertex.getNormal() * g_furHeight;
+      Cvec3 t = g_tipPos[index];
+      Cvec3 v = g_tipVelocity[index];
+      //calculate total force
+      Cvec3 force = g_gravity + (s - t) * g_stiffness;
+      //calculate tipPos
+      t = t + v * g_timeStep;
+      //caluclating the contraint on t
+      g_tipPos[index] = (p + ((t - p) / norm(t - p) * g_furHeight));      
+      //v = v +Tforce.damping
+      g_tipVelocity[index] = ((v + force * g_timeStep) * g_damping);
+    }
+  }   
   // schedule this to get called again
   glutTimerFunc(1000/g_simulationsPerSecond, hairsSimulationCallback, 0);
   glutPostRedisplay(); // signal redisplaying
@@ -1164,9 +1177,6 @@ static void hairsSimulationCallback(int dontCare) {
 static void initSimulation() {
   g_tipPos.resize(g_bunnyMesh.getNumVertices(), Cvec3(0));
   g_tipVelocity = g_tipPos;
-
-  // TASK 1 TODO: initialize g_tipPos to "at-rest" hair tips in world coordinates
-
  
   // Starts hair tip simulation
   hairsSimulationCallback(0);
@@ -1494,7 +1504,7 @@ static void animateMeshTimerCallback(int ms) {
 
   animateSurface(t);
 
-   glutTimerFunc(10, animateMeshTimerCallback,
+   glutTimerFunc(15, animateMeshTimerCallback,
                  ms + 10);
 }
 
@@ -1622,9 +1632,12 @@ static void initBunnyMeshes() {
    
   setMeshNormals(g_bunnyMesh); 
 
+
+  //initializing the tip position at each hair
   for (int i = 0; i < g_bunnyMesh.getNumVertices(); i++) {
-    g_tipPos.push_back(g_bunnyMesh.getVertex(i).getPosition() + g_bunnyMesh.getVertex(i).getNormal() * g_furHeight);
-    g_tipVelocity.push_back(Cvec3());
+    Mesh::Vertex x = g_bunnyMesh.getVertex(i);
+     g_tipPos.push_back(x.getPosition() + x.getNormal() * g_furHeight);
+   
   }
 
   cout << "initBunnyMeshes normals finsihed "  << endl;
@@ -1746,8 +1759,8 @@ static void initScene() {
   g_cubeNode->addChild(shared_ptr<MyShapeNode>(
                            new MyShapeNode(g_simpleGeometryPN, g_specularMat, Cvec3(-2.9, 0.0, 0.0))));
 
-  g_robot1Node.reset(new SgRbtNode(RigTForm(Cvec3(-2, 1, 0))));
-  g_robot2Node.reset(new SgRbtNode(RigTForm(Cvec3(2, 1, 0))));
+  g_robot1Node.reset(new SgRbtNode(RigTForm(Cvec3(-4, 1, 0))));
+  g_robot2Node.reset(new SgRbtNode(RigTForm(Cvec3(4, 1, 0))));
 
   g_light1Node.reset(new SgRbtNode(RigTForm(Cvec3(3.0, 2.5, 5))));
   g_light2Node.reset(new SgRbtNode(RigTForm(Cvec3(-3, 2.5, -3))));
@@ -1771,7 +1784,7 @@ static void initScene() {
    
 
   // default selection and view
-  g_currentPickedRbtNode = g_skyNode;
+  g_currentPickedRbtNode = g_bunnyNode;
   g_currentView = g_skyNode;
 
   constructRobot(g_robot1Node, g_redDiffuseMat); // a Red robot
@@ -1787,6 +1800,8 @@ static void initScene() {
 
   g_world->addChild(g_bunnyNode);
 
+ 
+
   // attach spheres to light nodes to make them pickable
   shared_ptr<SgGeometryShapeNode> shape(
       new MyShapeNode(g_arcball,
@@ -1800,6 +1815,8 @@ static void initScene() {
 
   // initialize rbtNodes pointers
   dumpSgRbtNodes(g_world, g_rbtNodes);
+
+ 
 }
 
 int main(int argc, char *argv[]) {
@@ -1815,7 +1832,7 @@ int main(int argc, char *argv[]) {
     initMaterials();
     initGeometry();
     initScene();
-    //initSimulation();
+    initSimulation();
    
     glutMainLoop();
     return 0;
