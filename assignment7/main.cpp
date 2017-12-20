@@ -954,31 +954,29 @@ bool catmullRomInterpolateAndDisplay(double t) {
 
 // Takes in a mesh and sets the normal of the vertices to the sum of all
 // faces incident to the vertex in the mesh
-static void setMeshNormals(Mesh &bunny) {
+static void setMeshNormals(Mesh &mesh) {
 
   //Zero out all of the vertex normals
-  for (int i = 0; i < bunny.getNumVertices(); i++) {
-    bunny.getVertex(i).setNormal(Cvec3());
+  for (int i = 0; i < mesh.getNumVertices(); i++) {
+    mesh.getVertex(i).setNormal(Cvec3());
   }
 
   //iterate through the faces of the mesh and  accumulate its normal to all its surrounding vertices
-  for (int i = 0; i < bunny.getNumFaces(); i++) {
+  for (int i = 0; i < mesh.getNumFaces(); i++) {
     
-    Mesh::Face meshFace = bunny.getFace(i);
-    const Cvec3 meshFaceNormal = meshFace.getNormal();
+    Mesh::Face face = mesh.getFace(i);
+    const Cvec3 faceNormal = face.getNormal();
 
-    for (int j = 0; j < meshFace.getNumVertices(); j++) {
-        Mesh::Vertex v = meshFace.getVertex(j);
-        v.setNormal( v.getNormal() + meshFaceNormal);
+    for (int j = 0; j < face.getNumVertices(); j++) {
+        Mesh::Vertex v = face.getVertex(j);
+        v.setNormal( v.getNormal() + faceNormal);
     }
 
     //assumed valency is 2 : TODO calculate the number of edges on this vertx
-     for (int j = 0; j < meshFace.getNumVertices(); j++) {
-        Mesh::Vertex v = meshFace.getVertex(j);
+     for (int j = 0; j < face.getNumVertices(); j++) {
+        Mesh::Vertex v = face.getVertex(j);
         Cvec3 vNormal = v.getNormal() ;
-        v.setNormal(v.getNormal() / 2);
-        
-        
+        v.setNormal(v.getNormal() / 2);     
      }
 
   }
@@ -1096,8 +1094,8 @@ static VertexPNX singleHairVertex(Mesh::Vertex vertex, int shellLayer, Cvec2 tex
   const Cvec3 n = vertex.getNormal() * (g_furHeight / g_numShells)   ; 
   //In world coordinates
   const Cvec3 t = bunnyObjectRBT * g_tipPos[vertex.getIndex()];   
-  //d is a vector estimated by us to have this value
-  const Cvec3 d =  ((t - p - n * 10 ) / 1000) * 2 ;  
+  //d is derived from the hair fiure
+  const Cvec3 d = ((t - p - n * g_numShells) /  (g_numShells * g_numShells/2))  ;
   
   if(shellLayer == 0){
     const Cvec3 point = vertex.getPosition();
@@ -1109,6 +1107,7 @@ static VertexPNX singleHairVertex(Mesh::Vertex vertex, int shellLayer, Cvec2 tex
     const Cvec3 point = g_calculatedShellVertices[shellLayer - 1][vertex.getIndex()];
     Cvec3 calculatedVertex = point + n + d * shellLayer;
     g_calculatedShellVertices[shellLayer][vertex.getIndex()] =  calculatedVertex; 
+    //pi - pi-1  as the normal
     const Cvec3 normal = calculatedVertex  - g_calculatedShellVertices[shellLayer - 1][vertex.getIndex()];    
     return VertexPNX(calculatedVertex , normal, texVec);
   }
@@ -1524,7 +1523,7 @@ static void initGlutState(int argc, char *argv[]) {
                       GLUT_DEPTH); //  RGBA pixel channels and double buffering
 #endif
   glutInitWindowSize(g_windowWidth, g_windowHeight); // create a window
-  glutCreateWindow("Assignment 5");                  // title the window
+  glutCreateWindow("Assignment 7");                  // title the window
 
   glutIgnoreKeyRepeat(true); // avoids repeated keyboard calls when holding
                              // space to emulate middle mouse
