@@ -29,7 +29,7 @@ Ahmad Ghizzawi and Chukri Soueidi.
  - We updated _updateShellGeometry()_ to show the hair curve based on the figure in the assignment.
  - We added a new data structure, an array of Cvec3 vectors _gcalculatedShellVertices_ in order to keep all calculated points on each shell.
  
-##Difficulties/Assumptions:
+## Difficulties/Assumptions:
 - In Part 1, task 2: We divided by 2 instead of calculating the valency at each vertex.
 - In Part 2, task 3: We derived d and got _((t - p - n * gnumShells) /  (gnumShells))_ The hairs were rendering too long so we minimized it to become _((t - p - n * gnumShells) /  (gnumShells * gnumShells/2))_
 - We used make OPT=1 since the code was running very slow without it.
