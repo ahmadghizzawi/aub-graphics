@@ -8,7 +8,7 @@ Ahmad Ghizzawi and Chukri Soueidi.
 
 ## Changes Overview 
 
-##Part 1
+## Part 1
 ### Task 1
 - We read the cube.mesh and converted the quads to triangles by dividing each quad into 2 trianle in _getVertices()_
 - We added the cube to the scenegraph 
@@ -16,7 +16,8 @@ Ahmad Ghizzawi and Chukri Soueidi.
 - We recaluclated new normals at the vertices by adding to each vertex's normal the face normal then we divided by 2. 
 ### Task 3
 - Added a sin function that animates the cube using a GLUT timer. The sin function consider the vertex and the time on order not to have a zoom in zoom out effect.
-##Part 2:
+
+## Part 2:
 ### Task 1
 - We copied the snippets into the project and it ran without any errors.
 - We implemented _updateShellGeometry()_ to render the hair on every vertex. 
